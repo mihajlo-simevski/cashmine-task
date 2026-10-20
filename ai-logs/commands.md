@@ -2726,3 +2726,387 @@ Every shell command run by Claude Code during the task, in order, with secrets a
    grep -n "proxy\|API_TOKEN" CLAUDE.md | head
    ```
 
+138. Export both sessions and the command list, then scan for leaks
+
+   ```sh
+   sed -i '' 's/ (needs the `production` env vars first)//' CLAUDE.md; S=<scratchpad> P=~/.claude/projects; cd $S && python3 -I export_log.py $P/-Users-<user>/b7dea157-a892-47f7-bc19-f543e9fb6ece.jsonl names.txt "Session 1: project setup (before the task slot)" > 01-setup.md && python3 -I export_log.py $P/-Users-<user>-Code-cashmine-task/87727f3e-83ef-46bf-9e8a-5fa093a77503.jsonl names.txt "Session 2: cleanup, planning, reviews, build and testing" > 02-build-session.md && sed -i '' 's/"02-cleanup-and-repo.md", "Session 2: cleanup, hosting rename and GitHub repo"/"02-build-session.md", "Session 2: cleanup, planning, reviews, build and testing"/' make_commands.py && python3 -I make_commands.py > commands.md && wc -l 01-setup.md 02-build-session.md commands.md && echo "--- leak scan:" && grep -ciE "ct1\.ey|<user>|<user>|m<user>|gmail\.com|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|sessionSecret|/Users/|\bIvan\b" 01-setup.md 02-build-session.md commands.md; grep -noE "ey[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}" 01-setup.md 02-build-session.md commands.md | head -3
+   ```
+
+139. Show which patterns matched and where
+
+   ```sh
+   S=<scratchpad> cd $S && grep -noiE "ct1\.ey|<user>|<user>|m<user>|gmail\.com|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|sessionSecret|/Users/|\bIvan\b" 01-setup.md 02-build-session.md commands.md | sort | uniq -c | sort -rn | head -30
+   ```
+
+140. Inspect /Users and sessionSecret matches
+
+   ```sh
+   S=<scratchpad> cd $S && grep -nE "/Users/|sessionSecret" 02-build-session.md | grep -v "/users/me" | cut -c1-170
+   ```
+
+141. Add logs, notes and README, check, commit and push
+
+   ```sh
+   S=<scratchpad> && cp $S/01-setup.md $S/02-build-session.md $S/commands.md ai-logs/ && git rm -q ai-logs/02-cleanup-and-repo.md && python3 -I - <<'EOF'
+   p = "ai-logs/README.md"
+   s = open(p).read()
+   s = s.replace("| [`02-cleanup-and-repo.md`](./02-cleanup-and-repo.md) | Cleanup, hosting rename, commits and the GitHub repo |", "| [`02-build-session.md`](./02-build-session.md) | Cleanup, design + plan with reviews, the build, Claude Design, browser testing against the live API |")
+   open(p, "w").write(s)
+   EOF
+   pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn"; git add -A ai-logs NOTES.md README.md CLAUDE.md && git commit -q -m "docs: add NOTES, README and AI logs
+   
+   Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error|no-tokens"; git push -q 2>&1|tail -1; git log --oneline -1; git status --short | head -3; date -u +%H:%M
+   ```
+
+142. Add signed amount parser, activity schema and strings
+
+   ```sh
+   cat >> src/features/money/amount.ts <<'EOF'
+   
+   /** Like parseAmount, but allows one leading "-" (activity amounts are signed). */
+   export function parseSignedAmount(input: string, decimals: number): ParseResult {
+     const negative = input.startsWith("-");
+     const result = parseAmount(negative ? input.slice(1) : input, decimals);
+     if (!result.ok || !negative) return result;
+     return { ok: true, value: -result.value };
+   }
+   EOF
+   cat >> src/features/money/__tests__/amount.test.ts <<'EOF'
+   
+   describe("parseSignedAmount", () => {
+     it("parses signed activity amounts exactly", () => {
+       expect(parseSignedAmount("-0.5", 18)).toEqual({ ok: true, value: -(5n * 10n ** 17n) });
+       expect(parseSignedAmount("9.81", 6)).toEqual({ ok: true, value: 9810000n });
+     });
+   
+     it.each(["--1", "-", "+1", "- 1", "-.5"])("rejects %p", (input) => {
+       expect(parseSignedAmount(input, 6)).toEqual({ ok: false, error: "format" });
+     });
+   });
+   EOF
+   sed -i '' 's/^  formatAmountShort,$/  formatAmountShort,\n  parseSignedAmount,/' src/features/money/__tests__/amount.test.ts
+   cat >> src/features/api/schemas.ts <<'EOF'
+   
+   const signedAmount = z
+     .string()
+     .max(81)
+     .regex(/^-?(0|[1-9]\d*)(\.\d+)?$/);
+   
+   export const ActivityItemSchema = z.object({
+     id: z.string().min(1).max(100),
+     // Shown as plain text; unknown values are displayed as-is rather than rejected.
+     type: z.string().max(40),
+     asset,
+     amount: signedAmount,
+     status: z.string().max(40),
+     exchange: z.string().max(100).nullable(),
+     createdAt: timestamp,
+     relatedId: z.string().max(100).nullable(),
+   });
+   
+   export const ActivityPageSchema = z.object({
+     items: z.array(ActivityItemSchema).max(20),
+     nextCursor: z.string().max(500).nullable(),
+   });
+   
+   export type ActivityItem = z.infer<typeof ActivityItemSchema>;
+   export type ActivityPage = z.infer<typeof ActivityPageSchema>;
+   EOF
+   python3 -I - <<'EOF'
+   p = "src/i18n/en.ts"
+   s = open(p).read()
+   s = s.replace("  status: {\n", '''  activity: {
+       title: "Activity",
+       open: "Activity",
+       empty: "No activity yet.",
+       loadError: "Couldn't load your activity.",
+       loadMore: "Load more",
+       loadingMore: "Loading…",
+       viewClaim: "View claim",
+       types: { accrual: "Payback earned", reversal: "Reversed", claim: "Claim" },
+       statuses: {
+         pending: "Pending",
+         confirmed: "Confirmed",
+         completed: "Completed",
+         failed: "Failed",
+       },
+     },
+     status: {
+   ''', 1)
+   open(p, "w").write(s)
+   EOF
+   grep -n "activity: {" src/i18n/en.ts
+   ```
+
+143. Add activity route and Home link, regenerate route types, run checks
+
+   ```sh
+   cat > src/app/activity.tsx <<'EOF'
+   import ActivityScreen from "@/features/activity/components/ActivityScreen";
+   import RequireToken from "@/features/token/components/RequireToken";
+   
+   export default function ActivityRoute() {
+     return <RequireToken>{(token) => <ActivityScreen token={token} />}</RequireToken>;
+   }
+   EOF
+   python3 -I - <<'EOF'
+   p = "src/features/balances/components/HomeScreen.tsx"
+   s = open(p).read()
+   old = '''        right={
+             <Link href="/token" asChild>
+               <Button size="sm" variant="<other-project>">
+                 <Text>{t("token.change")}</Text>
+               </Button>
+             </Link>
+           }'''
+   new = '''        right={
+             <View className="flex-row">
+               <Link href="/activity" asChild>
+                 <Button size="sm" variant="<other-project>">
+                   <Text className="text-accent-foreground">{t("activity.open")}</Text>
+                 </Button>
+               </Link>
+               <Link href="/token" asChild>
+                 <Button size="sm" variant="<other-project>">
+                   <Text>{t("token.change")}</Text>
+                 </Button>
+               </Link>
+             </View>
+           }'''
+   assert old in s
+   open(p, "w").write(s.replace(old, new, 1))
+   EOF
+   CI=1 perl -e 'alarm 40; exec @ARGV' npx expo start --port 8099 >/dev/null 2>&1; grep -c "activity" .expo/types/router.d.ts; pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn" | head
+   ```
+
+144. Use Pressable for claim rows, check, commit, deploy
+
+   ```sh
+   python3 -I - <<'EOF'
+   p = "src/features/activity/components/ActivityScreen.tsx"
+   s = open(p).read()
+   s = s.replace('import { View } from "react-native";', 'import { Pressable, View } from "react-native";', 1)
+   import re
+   s = re.sub(r'<View accessibilityRole="link" accessibilityHint=\{t\("activity.viewClaim"\)\}>(\s*)\{content\}(\s*)</View>',
+              r'<Pressable accessibilityRole="link" accessibilityHint={t("activity.viewClaim")}>\1{content}\2</Pressable>', s)
+   assert "Pressable accessibilityRole" in s
+   open(p, "w").write(s)
+   EOF
+   pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn"; git add -A src docs && git commit -q -m "feat: add paginated activity history
+   
+   Newest-first list of accruals, reversals and claims with Load more (cursor),
+   exact signed amounts, plain-text exchange and status, and claim rows linking
+   to their status screen.
+   
+   Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; pnpm export:web >/dev/null 2>&1 && ID=$(npx eas-cli@latest deploy --environment production --prod --non-interactive 2>&1 | grep -oE "cashmine-app--[a-z0-9]+" | head -1 | sed 's/cashmine-app--//'); npx eas-cli@latest deploy:alias --prod --id "$ID" --non-interactive 2>&1 | grep -iE "Production URL|error"; git log --oneline -1; date -u +%H:%M
+   ```
+
+145. Update NOTES and README for Activity, commit and push
+
+   ```sh
+   python3 -I - <<'EOF'
+   def rep(p, a, b):
+       s = open(p).read()
+       if a not in s: raise SystemExit(f"MISSING {p}: {a[:60]!r}")
+       open(p, "w").write(s.replace(a, b, 1))
+   rep("NOTES.md", "- **Activity history** (optional) is not built.\n", "- **Activity** is basic: a \"Load more\" list (cursor paging); no filters, and amounts for an asset\n  missing from the balances list are shown as the raw string.\n")
+   rep("NOTES.md", "Next: Activity with cursor paging, Home polling of open claims, screen tests for the claim flow.", "Next: Home polling of open claims, screen tests for the claim flow, activity filters.")
+   rep("README.md", "- **Tests:** 58 unit tests", "- **Activity:** newest-first history of accruals, reversals and claims with \"Load more\"\n  (cursor paging); a claim row opens its status.\n- **Tests:** 64 unit tests")
+   print("ok")
+   EOF
+   pnpm fmt >/dev/null 2>&1; git add NOTES.md README.md && git commit -q -m "docs: note activity history in README and NOTES
+   
+   Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; git log --oneline -1; date -u +%H:%M
+   ```
+
+146. Add safe paging rule, lenient page size, tests; run checks
+
+   ```sh
+   mkdir -p src/features/activity/__tests__ && cat > src/features/activity/paging.ts <<'EOF'
+   import type { ActivityPage } from "@/features/api/schemas";
+   
+   /**
+    * The cursor for the next page, or undefined to stop. Stops on an empty page, an empty
+    * cursor, or a cursor equal to the one just used, so a server bug can't make
+    * "Load more" loop forever on the same records.
+    */
+   export function nextActivityCursor(
+     page: ActivityPage,
+     lastCursor: string | null,
+   ): string | undefined {
+     if (page.items.length === 0 || !page.nextCursor || page.nextCursor === lastCursor) {
+       return undefined;
+     }
+     return page.nextCursor;
+   }
+   EOF
+   cat > src/features/activity/__tests__/paging.test.ts <<'EOF'
+   import { nextActivityCursor } from "@/features/activity/paging";
+   import { ActivityPageSchema } from "@/features/api/schemas";
+   
+   const item = {
+     id: "act_1",
+     type: "accrual",
+     asset: "USDT",
+     amount: "9.81",
+     status: "confirmed",
+     exchange: "Binance",
+     createdAt: "2026-10-20T19:00:00.000Z",
+     relatedId: null,
+   };
+   
+   describe("nextActivityCursor", () => {
+     it("follows the server's cursor", () => {
+       expect(nextActivityCursor({ items: [item], nextCursor: "c2" }, null)).toBe("c2");
+     });
+   
+     it("stops on the last page, an empty page, an empty or repeated cursor", () => {
+       expect(nextActivityCursor({ items: [item], nextCursor: null }, "c1")).toBeUndefined();
+       expect(nextActivityCursor({ items: [], nextCursor: "c2" }, "c1")).toBeUndefined();
+       expect(nextActivityCursor({ items: [item], nextCursor: "" }, "c1")).toBeUndefined();
+       expect(nextActivityCursor({ items: [item], nextCursor: "c1" }, "c1")).toBeUndefined();
+     });
+   });
+   
+   describe("ActivityPageSchema", () => {
+     it("accepts the documented last page and signed amounts", () => {
+       const page = { items: [{ ...item, type: "claim", amount: "-0.5", relatedId: "clm_1" }], nextCursor: null };
+       expect(ActivityPageSchema.parse(page)).toEqual(page);
+     });
+   
+     it("keeps unknown types and statuses as text but rejects bad amounts", () => {
+       expect(ActivityPageSchema.safeParse({ items: [{ ...item, type: "bonus", status: "new" }], nextCursor: null }).success).toBe(true);
+       expect(ActivityPageSchema.safeParse({ items: [{ ...item, amount: "1e3" }], nextCursor: null }).success).toBe(false);
+       expect(ActivityPageSchema.safeParse({ items: [{ ...item, amount: 9.81 }], nextCursor: null }).success).toBe(false);
+     });
+   });
+   EOF
+   python3 -I - <<'EOF'
+   def rep(p, a, b):
+       s = open(p).read()
+       if a not in s: raise SystemExit(f"MISSING {p}: {a[:60]!r}")
+       open(p, "w").write(s.replace(a, b, 1))
+   rep("src/features/api/schemas.ts", "items: z.array(ActivityItemSchema).max(20),", "items: z.array(ActivityItemSchema).max(50),")
+   p = "src/features/activity/components/ActivityScreen.tsx"
+   rep(p, "getNextPageParam: (page) => page.nextCursor ?? undefined,", "getNextPageParam: (page, _all, lastCursor) => nextActivityCursor(page, lastCursor),")
+   rep(p, 'import { useBalances } from "@/features/balances/useBalances";', 'import { nextActivityCursor } from "@/features/activity/paging";\nimport { useBalances } from "@/features/balances/useBalances";')
+   print("ok")
+   EOF
+   pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn|●"
+   ```
+
+147. Record review outcome, commit, push, deploy
+
+   ```sh
+   cat >> docs/superpowers/plans/2026-10-20-activity.md <<'EOF'
+   
+   ## Review outcome (two external reviews, after the first build)
+   
+   Already handled in the build: no `cursor` on the first page (only added when set, encoded);
+   requests carry their token explicitly and keys include the token fingerprint; decimals only from
+   the same token's balances, otherwise (or on a parse failure) the exact API string is shown;
+   `relatedId` is the claim id per the docs and the live test (link only on claim rows; the status
+   screen handles 404); newest-first and `nextCursor: null` are documented and seen live; shared
+   retry policy; first-page vs later-page errors; signed values formatted as-is (no double sign);
+   unknown type/status shown as text with a neutral badge. Not applicable: moving
+   `parseSignedAmount` for the activity-matching fallback (that fallback was removed earlier).
+   
+   Fixed: `nextActivityCursor` stops on an empty page, an empty or repeated cursor (no endless
+   "Load more"); page size limit relaxed to 50; tests for the paging rule and the page schema.
+   Skipped for time: screen tests for Activity (noted in NOTES.md).
+   EOF
+   git add -A src docs && git commit -q -m "fix: stop activity paging on empty pages and repeated cursors
+   
+   From the external review of the activity plan: guard against a server bug
+   making Load more loop; relax the page size limit; test the paging rule and
+   the page schema.
+   
+   Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; pnpm export:web >/dev/null 2>&1 && ID=$(npx eas-cli@latest deploy --environment production --prod --non-interactive 2>&1 | grep -oE "cashmine-app--[a-z0-9]+" | head -1 | sed 's/cashmine-app--//'); npx eas-cli@latest deploy:alias --prod --id "$ID" --non-interactive 2>&1 | grep -iE "Production URL|error"; git log --oneline -1; date -u +%H:%M
+   ```
+
+148. Deduplicate activity items across pages, test, check
+
+   ```sh
+   python3 -I - <<'EOF'
+   def rep(p, a, b):
+       s = open(p).read()
+       if a not in s: raise SystemExit(f"MISSING {p}: {a[:60]!r}")
+       open(p, "w").write(s.replace(a, b, 1))
+   rep("src/features/activity/paging.ts", "export function nextActivityCursor(", '''/**
+    * Joins pages, dropping repeated ids. New activity arriving between page loads shifts the
+    * newest-first list, so the next page can repeat an item already shown.
+    */
+   export function mergeActivityPages(pages: ActivityPage[]): ActivityPage["items"] {
+     const seen = new Set<string>();
+     return pages
+       .flatMap((page) => page.items)
+       .filter((item) => (seen.has(item.id) ? false : (seen.add(item.id), true)));
+   }
+   
+   export function nextActivityCursor(''')
+   p = "src/features/activity/components/ActivityScreen.tsx"
+   rep(p, "const items = query.data?.pages.flatMap((p) => p.items) ?? [];", "const items = query.data ? mergeActivityPages(query.data.pages) : [];")
+   rep(p, 'import { nextActivityCursor } from "@/features/activity/paging";', 'import { mergeActivityPages, nextActivityCursor } from "@/features/activity/paging";')
+   t = "src/features/activity/__tests__/paging.test.ts"
+   rep(t, 'import { nextActivityCursor } from "@/features/activity/paging";', 'import { mergeActivityPages, nextActivityCursor } from "@/features/activity/paging";')
+   s = open(t).read()
+   s += '''
+   describe("mergeActivityPages", () => {
+     it("drops an item repeated on the next page when the list shifted", () => {
+       const a = { ...item, id: "act_a" };
+       const b = { ...item, id: "act_b" };
+       const merged = mergeActivityPages([
+         { items: [a, b], nextCursor: "c2" },
+         { items: [b, { ...item, id: "act_c" }], nextCursor: null },
+       ]);
+       expect(merged.map((i) => i.id)).toEqual(["act_a", "act_b", "act_c"]);
+     });
+   });
+   '''
+   open(t, "w").write(s)
+   print("ok")
+   EOF
+   pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn|●"; tail -3 <scratchpad>
+   ```
+
+149. Commit, push and deploy the dedupe fix
+
+   ```sh
+   git add -A src && git commit -q -m "fix: drop activity items repeated across pages
+   
+   New activity arriving between page loads shifts the newest-first list, so the
+   next page repeated an item (seen as a duplicate React key while testing).
+   
+   Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; pnpm export:web >/dev/null 2>&1 && ID=$(npx eas-cli@latest deploy --environment production --prod --non-interactive 2>&1 | grep -oE "cashmine-app--[a-z0-9]+" | head -1 | sed 's/cashmine-app--//'); npx eas-cli@latest deploy:alias --prod --id "$ID" --non-interactive 2>&1 | grep -iE "Production URL|error"; git log --oneline -1; date -u +%H:%M
+   ```
+
+150. Sweep files, history, bundle and EAS env for sensitive data
+
+   ```sh
+   S=<scratchpad>
+   P='ct[0-9]\.[A-Za-z0-9_-]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|gh[opsu]_[A-Za-z0-9]{20,}|m<user>|gmail\.com|<user>|<user>|/Users/[a-z]|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|BEGIN [A-Z ]*PRIVATE KEY|\bIvan\b'
+   echo "== 1. tracked files now:"; git grep -nIiE "$P" -- . ':!pnpm-lock.yaml' | grep -viE "/users/me|ct\[0-9\]|lefthook.yml" | cut -c1-140 | head
+   echo "== 2. every commit in history:"; git grep -lIiE "$P" $(git rev-list --all) -- . ':!pnpm-lock.yaml' 2>/dev/null | sed 's/^[0-9a-f]*://' | sort | uniq -c | head
+   echo "== 3. env/secret files ever tracked:"; git log --all --name-only --format= | grep -iE "(^|/)\.env|\.pem$|\.key$|secret" | sort -u
+   echo "== 4. deployed bundle (dist):"; pnpm export:web >/dev/null 2>&1; grep -rlIE "ct[0-9]\.[A-Za-z0-9_-]{20,}|EXPO_PUBLIC|API_TOKEN" dist | head; echo "(none above = clean)"
+   echo "== 5. EAS env vars:"; for e in production preview; do npx eas-cli@latest env:list --environment $e 2>&1 | grep -E "^[A-Z_]+ |No variables|Name" | sed -E 's/(Value[^:]*:).*/\1 <hidden>/' | head -3; done
+   ```
+
+151. Show which patterns matched in history
+
+   ```sh
+   P='ct[0-9]\.[A-Za-z0-9_-]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|gh[opsu]_[A-Za-z0-9]{20,}|m<user>|gmail\.com|<user>|<user>|/Users/[a-z]|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|BEGIN [A-Z ]*PRIVATE KEY|\bIvan\b'; git grep -hoIiE "$P" $(git rev-list --all) -- ai-logs src 2>/dev/null | sort | uniq -c | sort -rn | head -15
+   ```
+
+152. Check commit cadence and notes length
+
+   ```sh
+   git log --since="2026-10-20T19:00:00Z" --format='%cI' | sort | python3 -I -c "
+   import sys, datetime as d
+   t=[d.datetime.fromisoformat(l.strip()) for l in sys.stdin if l.strip()]
+   start=d.datetime.fromisoformat('2026-10-20T19:00:00+00:00')
+   gaps=[(b-a).total_seconds()/60 for a,b in zip([start]+t, t)]
+   print('commits in slot:', len(t), '| first:', t[0].astimezone(d.timezone.utc).strftime('%H:%M'), '| last:', t[-1].astimezone(d.timezone.utc).strftime('%H:%M'), '| max gap (min):', round(max(gaps),1))
+   "; wc -w NOTES.md | awk '{print "NOTES words:", $1}'; git log --oneline | wc -l | awk '{print "total commits:", $1}'
+   ```
+

@@ -5547,3 +5547,923 @@ ok
 
 </details>
 
+## Claude
+
+Now the AI-log export, with the same scrubbing as before plus the token redaction:
+
+**Bash**: Export both sessions and the command list, then scan for leaks
+
+```sh
+sed -i '' 's/ (needs the `production` env vars first)//' CLAUDE.md; S=<scratchpad> P=~/.claude/projects; cd $S && python3 -I export_log.py $P/-Users-<user>/b7dea157-a892-47f7-bc19-f543e9fb6ece.jsonl names.txt "Session 1: project setup (before the task slot)" > 01-setup.md && python3 -I export_log.py $P/-Users-<user>-Code-cashmine-task/87727f3e-83ef-46bf-9e8a-5fa093a77503.jsonl names.txt "Session 2: cleanup, planning, reviews, build and testing" > 02-build-session.md && sed -i '' 's/"02-cleanup-and-repo.md", "Session 2: cleanup, hosting rename and GitHub repo"/"02-build-session.md", "Session 2: cleanup, planning, reviews, build and testing"/' make_commands.py && python3 -I make_commands.py > commands.md && wc -l 01-setup.md 02-build-session.md commands.md && echo "--- leak scan:" && grep -ciE "ct1\.ey|<user>|<user>|m<user>|gmail\.com|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|sessionSecret|/Users/|\bIvan\b" 01-setup.md 02-build-session.md commands.md; grep -noE "ey[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}" 01-setup.md 02-build-session.md commands.md | head -3
+```
+
+_(output omitted: lists unrelated personal data)_
+
+**Bash**: Show which patterns matched and where
+
+```sh
+S=<scratchpad> cd $S && grep -noiE "ct1\.ey|<user>|<user>|m<user>|gmail\.com|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|sessionSecret|/Users/|\bIvan\b" 01-setup.md 02-build-session.md commands.md | sort | uniq -c | sort -rn | head -30
+```
+
+_(output omitted: lists unrelated personal data)_
+
+**Bash**: Inspect /Users and sessionSecret matches
+
+```sh
+S=<scratchpad> cd $S && grep -nE "/Users/|sessionSecret" 02-build-session.md | grep -v "/users/me" | cut -c1-170
+```
+
+<details><summary>output</summary>
+
+```
+55:ls -la ai-logs; grep -rniE "<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<user>|<user>|m<user>|<expo
+221:const secret = JSON.parse(readFileSync(`${homedir()}/.expo/state.json`, "utf8")).auth.sessionSecret;
+538:git status --short | wc -l; git log --format='%h %an <%ae> | %s'; git grep -niE "<other-project>|<other-project>|<user>|<user>|m<user>|/Users/" $(git rev-list --all) 
+666:S=<scratchpad> { ls ~/Code; gh repo list --limit 300 --json name -q '.[].name'; } | sort -u | grep -viE '^cashmine' > $S/names.txt; wc -l < $S/names.txt; cd ~/.claude
+682:grep -niE "<user>|<user>|m<user>|<expo-account>|<other-project>|<other-project>|/Users/|gmail|gho_|sessionSecret" 01-setup.md 02-cleanup-and-repo.md | cut -c1-160 | h
+Shell cwd was reset to ~/Code/cashmine-task
+```
+
+</details>
+
+**Bash**: Add logs, notes and README, check, commit and push
+
+```sh
+S=<scratchpad> && cp $S/01-setup.md $S/02-build-session.md $S/commands.md ai-logs/ && git rm -q ai-logs/02-cleanup-and-repo.md && python3 -I - <<'EOF'
+p = "ai-logs/README.md"
+s = open(p).read()
+s = s.replace("| [`02-cleanup-and-repo.md`](./02-cleanup-and-repo.md) | Cleanup, hosting rename, commits and the GitHub repo |", "| [`02-build-session.md`](./02-build-session.md) | Cleanup, design + plan with reviews, the build, Claude Design, browser testing against the live API |")
+open(p, "w").write(s)
+EOF
+pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn"; git add -A ai-logs NOTES.md README.md CLAUDE.md && git commit -q -m "docs: add NOTES, README and AI logs
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error|no-tokens"; git push -q 2>&1|tail -1; git log --oneline -1; git status --short | head -3; date -u +%H:%M
+```
+
+<details><summary>output</summary>
+
+```
+$ oxlint --deny-warnings
+Tests:       58 passed, 58 total
+┃  no-tokens ❯ 
+✔️ no-tokens (0.02 seconds)
+9a9e38b docs: add NOTES, README and AI logs
+20:11
+```
+
+</details>
+
+## Claude
+
+`NOTES.md`, the README and the AI logs are committed and pushed (20:11 UTC). All three parts the brief asks for are in place.
+
+- **`NOTES.md`**:
+  - **Decisions:** how amounts are stored, approach B for the balance after a claim (with A and C rejected), and how an unclear claim result is handled. Each one points to where it's discussed in the logs.
+  - **Working with AI:** three moments. The "light variation" prompt that missed and was changed to "cashmine.io colors". Wrong or risky AI output: the $820.58 test value, the 10-minute record clearing, and the stale-freshness bug. Where I disagreed: the SHA-256 suggestion and the made-up progress bar.
+  - **Not done:** Activity history, polling pending claims from Home, screen-level tests, pull-to-refresh, light theme only.
+- **README:** the live link, how to run it locally, what works, and a note that CashMine's name, colors and logo belong to them.
+- **AI logs:** both sessions plus `commands.md` (the list of commands you asked for earlier). I scanned them for your name, email, paths, project and org names and tokens, and found nothing.
+- **`CLAUDE.md`:** its proxy and token sections were out of date, so I updated them.
+
+The live app already runs the latest code, since only documents changed.
+
+49 minutes remain. Two ways to use them:
+1. **Build Activity now** (~15 min, optional in the brief): history with "Load more", then deploy by 20:30.
+2. **Stop building and hold the buffer.**
+
+Either way, I'll export this conversation once more around 20:45 so the logs cover everything, then do the final push before 21:00. Which do you prefer?
+
+## User
+
+did we not built everything already?
+
+## Claude
+
+Everything **required** is built. The one optional piece, Activity history, isn't.
+
+The brief listed four items in priority order:
+
+| # | Brief item | Status |
+|---|---|---|
+| 1 | Balances (Home): balances per asset, USD total, how fresh the data is, loading, error and retry, refresh | ✅ Done, tested against the live API |
+| 2 | Claim: asset, amount or Max, fee and amount received, confirm, follow the claim until it settles, input checks | ✅ Done, including the duplicate-claim protection (tested for real) |
+| 3 | Tests for the amount logic: parsing, validation, fee, totals | ✅ 58 tests |
+| 4 | **Activity (if time allows):** paginated history | ❌ Not built |
+
+Also required and done: the token screen, the live link, the public repo with full history, `NOTES.md`, the README, and the AI logs.
+
+The brief says "doing fewer things correctly is better than doing everything halfway," and `NOTES.md` already lists Activity as not done. Skipping it is a valid submission. Building it would add points if it works, and it fits in the time left.
+
+I'd build it now (~15 min, deployed by 20:30) and keep the 20:45 log export and the 21:00 cut-off fixed. Should I?
+
+## User
+
+yes built it, but lets do a desing and implementation plan first
+
+## Claude
+
+I'll keep it short: a mini design and plan in one file, matching the earlier documents.
+
+**Write** `~/Code/cashmine-task/docs/superpowers/plans/2026-10-20-activity.md` (38 lines)
+
+## Claude
+
+The plan is written to `docs/superpowers/plans/2026-10-20-activity.md`. It's small and follows patterns already in the app, so I'm building it straight away; it's a 15-minute time box.
+
+**Bash**: Add signed amount parser, activity schema and strings
+
+```sh
+cat >> src/features/money/amount.ts <<'EOF'
+
+/** Like parseAmount, but allows one leading "-" (activity amounts are signed). */
+export function parseSignedAmount(input: string, decimals: number): ParseResult {
+  const negative = input.startsWith("-");
+  const result = parseAmount(negative ? input.slice(1) : input, decimals);
+  if (!result.ok || !negative) return result;
+  return { ok: true, value: -result.value };
+}
+EOF
+cat >> src/features/money/__tests__/amount.test.ts <<'EOF'
+
+describe("parseSignedAmount", () => {
+  it("parses signed activity amounts exactly", () => {
+    expect(parseSignedAmount("-0.5", 18)).toEqual({ ok: true, value: -(5n * 10n ** 17n) });
+    expect(parseSignedAmount("9.81", 6)).toEqual({ ok: true, value: 9810000n });
+  });
+
+  it.each(["--1", "-", "+1", "- 1", "-.5"])("rejects %p", (input) => {
+    expect(parseSignedAmount(input, 6)).toEqual({ ok: false, error: "format" });
+  });
+});
+EOF
+sed -i '' 's/^  formatAmountShort,$/  formatAmountShort,\n  parseSignedAmount,/' src/features/money/__tests__/amount.test.ts
+cat >> src/features/api/schemas.ts <<'EOF'
+
+const signedAmount = z
+  .string()
+  .max(81)
+  .regex(/^-?(0|[1-9]\d*)(\.\d+)?$/);
+
+export const ActivityItemSchema = z.object({
+  id: z.string().min(1).max(100),
+  // Shown as plain text; unknown values are displayed as-is rather than rejected.
+  type: z.string().max(40),
+  asset,
+  amount: signedAmount,
+  status: z.string().max(40),
+  exchange: z.string().max(100).nullable(),
+  createdAt: timestamp,
+  relatedId: z.string().max(100).nullable(),
+});
+
+export const ActivityPageSchema = z.object({
+  items: z.array(ActivityItemSchema).max(20),
+  nextCursor: z.string().max(500).nullable(),
+});
+
+export type ActivityItem = z.infer<typeof ActivityItemSchema>;
+export type ActivityPage = z.infer<typeof ActivityPageSchema>;
+EOF
+python3 -I - <<'EOF'
+p = "src/i18n/en.ts"
+s = open(p).read()
+s = s.replace("  status: {\n", '''  activity: {
+    title: "Activity",
+    open: "Activity",
+    empty: "No activity yet.",
+    loadError: "Couldn't load your activity.",
+    loadMore: "Load more",
+    loadingMore: "Loading…",
+    viewClaim: "View claim",
+    types: { accrual: "Payback earned", reversal: "Reversed", claim: "Claim" },
+    statuses: {
+      pending: "Pending",
+      confirmed: "Confirmed",
+      completed: "Completed",
+      failed: "Failed",
+    },
+  },
+  status: {
+''', 1)
+open(p, "w").write(s)
+EOF
+grep -n "activity: {" src/i18n/en.ts
+```
+
+**Write** `~/Code/cashmine-task/src/features/activity/components/ActivityScreen.tsx` (165 lines)
+
+**Bash**: Add activity route and Home link, regenerate route types, run checks
+
+```sh
+cat > src/app/activity.tsx <<'EOF'
+import ActivityScreen from "@/features/activity/components/ActivityScreen";
+import RequireToken from "@/features/token/components/RequireToken";
+
+export default function ActivityRoute() {
+  return <RequireToken>{(token) => <ActivityScreen token={token} />}</RequireToken>;
+}
+EOF
+python3 -I - <<'EOF'
+p = "src/features/balances/components/HomeScreen.tsx"
+s = open(p).read()
+old = '''        right={
+          <Link href="/token" asChild>
+            <Button size="sm" variant="<other-project>">
+              <Text>{t("token.change")}</Text>
+            </Button>
+          </Link>
+        }'''
+new = '''        right={
+          <View className="flex-row">
+            <Link href="/activity" asChild>
+              <Button size="sm" variant="<other-project>">
+                <Text className="text-accent-foreground">{t("activity.open")}</Text>
+              </Button>
+            </Link>
+            <Link href="/token" asChild>
+              <Button size="sm" variant="<other-project>">
+                <Text>{t("token.change")}</Text>
+              </Button>
+            </Link>
+          </View>
+        }'''
+assert old in s
+open(p, "w").write(s.replace(old, new, 1))
+EOF
+CI=1 perl -e 'alarm 40; exec @ARGV' npx expo start --port 8099 >/dev/null 2>&1; grep -c "activity" .expo/types/router.d.ts; pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn" | head
+```
+
+<details><summary>output</summary>
+
+```
+104:  activity: {
+```
+
+</details>
+
+_(output omitted: lists unrelated personal data)_
+
+## Claude
+
+Checks pass with 64 tests. One fix before shipping: a link that wraps a plain `View` doesn't respond to taps, so claim rows need `Pressable` to open their status screen.
+
+**Bash**: Use Pressable for claim rows, check, commit, deploy
+
+```sh
+python3 -I - <<'EOF'
+p = "src/features/activity/components/ActivityScreen.tsx"
+s = open(p).read()
+s = s.replace('import { View } from "react-native";', 'import { Pressable, View } from "react-native";', 1)
+import re
+s = re.sub(r'<View accessibilityRole="link" accessibilityHint=\{t\("activity.viewClaim"\)\}>(\s*)\{content\}(\s*)</View>',
+           r'<Pressable accessibilityRole="link" accessibilityHint={t("activity.viewClaim")}>\1{content}\2</Pressable>', s)
+assert "Pressable accessibilityRole" in s
+open(p, "w").write(s)
+EOF
+pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn"; git add -A src docs && git commit -q -m "feat: add paginated activity history
+
+Newest-first list of accruals, reversals and claims with Load more (cursor),
+exact signed amounts, plain-text exchange and status, and claim rows linking
+to their status screen.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; pnpm export:web >/dev/null 2>&1 && ID=$(npx eas-cli@latest deploy --environment production --prod --non-interactive 2>&1 | grep -oE "cashmine-app--[a-z0-9]+" | head -1 | sed 's/cashmine-app--//'); npx eas-cli@latest deploy:alias --prod --id "$ID" --non-interactive 2>&1 | grep -iE "Production URL|error"; git log --oneline -1; date -u +%H:%M
+```
+
+<details><summary>output</summary>
+
+```
+$ oxlint --deny-warnings
+Tests:       64 passed, 64 total
+Production URL  https://cashmine-app.expo.app
+9ca06e6 feat: add paginated activity history
+20:15
+```
+
+</details>
+
+## Claude
+
+Deployed at 20:15. A quick look at the live Activity screen:
+
+**Browser** `navigate` https://cashmine-app.expo.app/activity
+
+**Browser** `browser_batch`
+
+**Browser** `browser_batch`
+
+**Browser** `tabs_close_mcp`
+
+**Bash**: Update NOTES and README for Activity, commit and push
+
+```sh
+python3 -I - <<'EOF'
+def rep(p, a, b):
+    s = open(p).read()
+    if a not in s: raise SystemExit(f"MISSING {p}: {a[:60]!r}")
+    open(p, "w").write(s.replace(a, b, 1))
+rep("NOTES.md", "- **Activity history** (optional) is not built.\n", "- **Activity** is basic: a \"Load more\" list (cursor paging); no filters, and amounts for an asset\n  missing from the balances list are shown as the raw string.\n")
+rep("NOTES.md", "Next: Activity with cursor paging, Home polling of open claims, screen tests for the claim flow.", "Next: Home polling of open claims, screen tests for the claim flow, activity filters.")
+rep("README.md", "- **Tests:** 58 unit tests", "- **Activity:** newest-first history of accruals, reversals and claims with \"Load more\"\n  (cursor paging); a claim row opens its status.\n- **Tests:** 64 unit tests")
+print("ok")
+EOF
+pnpm fmt >/dev/null 2>&1; git add NOTES.md README.md && git commit -q -m "docs: note activity history in README and NOTES
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; git log --oneline -1; date -u +%H:%M
+```
+
+<details><summary>output</summary>
+
+```
+ok
+f864bfd docs: note activity history in README and NOTES
+20:16
+```
+
+</details>
+
+## Claude
+
+Activity history is built and live (deployed at 20:15 UTC), so all four items in the brief are now done.
+
+**What I checked in the browser against the live API:**
+- The first page loads with the right labels: Payback earned, Reversed, Claim.
+- Amounts show their sign and color: earnings in green, outgoing amounts plain.
+- Each row shows its exchange and date, and a status badge: Confirmed, Completed, or Failed in red.
+- Load more appends the next page, and the button disappears on the last page.
+
+I wrote the mini design and plan first, in `docs/superpowers/plans/2026-10-20-activity.md`. I also updated the README and `NOTES.md`, which no longer list Activity as missing. 64 tests pass, and everything is pushed.
+
+Still to do: one last export of this conversation into `ai-logs/` and a final push. I'll do it at about 20:45 so the logs cover the end of the session, leaving a buffer before 21:00. After that, nothing gets pushed or deployed.
+
+For your submission email:
+- **Repo:** https://github.com/<github-user>/cashmine-task
+- **Live:** https://cashmine-app.expo.app
+- **Time spent:** about 2 hours in the slot, plus setup done beforehand
+
+## User
+
+> _[pasted text]_
+
+# Review: Activity history design + plan
+
+This is a sensible, correctly-scoped plan for a 15-minute timebox, and the defensive choices (lenient `type`/`status`, plain-text rendering, "Load more" instead of infinite scroll, raw-string fallback for unknown assets) are the right ones. There is one real cross-task dependency bug, two implementation traps that will silently produce wrong data, and a couple of assumptions that should be verified or written down. Details below.
+
+## Blocking / must fix
+
+**M1. `parseSignedAmount` is in the wrong task.** The plan puts it in Step 1 of Activity ("`src/features/money/amount.ts`: `parseSignedAmount`…"). But Task 4's `findClaimInActivity` already needs sign-normalised comparison (`amount === "-" + body.amount` fails for `"-0.50"` vs `"0.5"`), and Task 4 is built **before** Activity and must survive Activity being cut. If `parseSignedAmount` lives only in the Activity task, the claim fallback either stays broken or duplicates the parser. **Move `parseSignedAmount` (and its tests) into Task 1 (money core)** so both Task 4 and Activity consume it. This is a one-line plan fix but a real ordering bug.
+
+**M2. `initialPageParam: null` will send `cursor=null` unless the queryFn omits it.** The plan shows `initialPageParam: null` and `getNextPageParam: (p) => p.nextCursor` but never says how `pageParam` maps to the request. In TanStack Query v5 the first page's `pageParam` is `null`, and a naive `` `activity?limit=20&cursor=${pageParam}` `` sends the literal string `cursor=null`. The queryFn must be explicit: `pageParam == null ? { limit: 20 } : { limit: 20, cursor: pageParam }`, with `encodeURIComponent(cursor)`. Add a test that the first request has no `cursor` param.
+
+**M3. The decimals source has no fallback for "asset known, balances not loaded".** "Each item's decimals come from the balances snapshot for that asset" is the right idea, but the screen can render before `useBalances()` resolves (deep link to `/activity`, or balances query error). In that window `parseSignedAmount` can't run, and the plan's fallback only covers "unknown asset". Specify: decimals come from `useBalances()`; if balances are loading/erroring or the asset is absent, render the API string as plain text for that row (no parse, no crash). Same fallback for `too_many_decimals` — if the API returns more decimals than the snapshot claims, trust the string, not the parse. This matters because the activity list is the one place where a bad parse would show a *wrong number* rather than an error.
+
+**M4. Guard against a zero-item page with a non-null cursor.** If the API ever returns `{ items: [], nextCursor: "…" }` (server bug or a race), `getNextPageParam` returns the cursor and "Load more" loops forever on empty pages. Either add `items.length === 0 ? null : p.nextCursor` as the next-page rule, or assert `items.length > 0` in the schema when `nextCursor` is non-null. Cheap insurance on a screen whose only job is to not mislead.
+
+## Should fix
+
+- **S1. Verify newest-first ordering.** The design asserts "newest-first" but the plan never says whether the API guarantees it or the client sorts. If the API returns oldest-first, the whole screen is wrong. Confirm with one real call (or the docs) and write it down as an assumption in NOTES.md. If unverified, sorting a single page doesn't fix cross-page order anyway — so this is a "trust the API, document it" item.
+- **S2. Verify `nextCursor` is `null` (not omitted) on the last page.** The schema is strict (`string | null`); if the API omits the field, zod rejects the last page and the list errors at the end. One real call settles it. If it's omitted, make the schema `.nullable().optional()` and normalise to `null` before `getNextPageParam`.
+- **S3. Reuse the existing retry policy.** The plan doesn't mention retries for activity queries. It should inherit Task 2's `shouldRetryQuery` / `retryDelay` (429/5xx/504/network retry, `retryAfterMs` honoured, 401/400 no retry). Otherwise the list silently retries forever on 401. Also cap `retryAfterMs` as per the earlier review.
+- **S4. Two distinct error states, not one.** "First page failed" (`isError`) and "later page failed" (`isFetchNextPageError`) need different UI: full-screen error+Retry for the former, inline error under the list for the latter. A 401 in either case shows "Change token". The plan describes the inline case but not the first-page case explicitly — make both.
+- **S5. `parseSignedAmount` edge cases.** The listed tests (`-0.5`, `0.5`, `--1`, `-`, `+1`) are good. Add `-0` and `-0.000` (bigint loses the sign — decide: show `0`, not `-0`), and `-0.1234567` with 6 decimals → `too_many_decimals`. Also confirm it never returns a `Number`.
+- **S6. Unknown `status`/`type` need a default, not just a string.** The design says "unknown type/status shown as raw text, never crash" — good — but the icon tint and badge colour also need a default (neutral) for unknown values. Specify the mapping table with a `default: neutral` branch, or a future status will render unstyled or throw on a missing key.
+- **S7. Timebox is optimistic.** 15 minutes for `parseSignedAmount` + tests, schema, screen, header link, `pnpm check`, commit, deploy and smoke test is closer to 20–25 min in practice, especially with the `useInfiniteQuery` wiring. The plan says "Cut if it slips" — make the cut list explicit now: **minimum viable** = first page + Load more + claim row link + error/empty states; **droppable** = skeleton rows, icon tints, `Amount` "more" chip, inline later-page error (fall back to a banner). Commit at each step so a partial Activity is deployable.
+- **S8. The `Amount` "more" chip is undefined work.** If this is a new component, it's a time sink and it isn't in any earlier task's "Produces" list. If it doesn't already exist, drop it for v1 and render `formatAmount(value, decimals, { trim: true })` (already built in Task 1). "Exact + shortened with a more chip" is fine as a goal but must not block the deploy.
+- **S9. `relatedId` is untrusted — encode it and only link for claims.** `router.push('/claims/' + relatedId)` with a raw `relatedId` containing `/` or `..` could navigate somewhere unintended (still in-app, so low severity, but avoidable). Use `encodeURIComponent(relatedId)`, and only link when `type === "claim" && relatedId != null`. Non-claim rows with `relatedId` should render it as plain text or ignore it.
+- **S10. Test coverage.** The 15-min plan omits `ActivityScreen.test.tsx` entirely (the earlier implementation plan had it). At minimum test `parseSignedAmount` (now in Task 1) and the `ActivityPageSchema` (including the last-page `nextCursor: null` shape). If any screen test happens, prioritise: "Load more" calls `fetchNextPage` with `cursor=<nextCursor>`; button hidden when `hasNextPage` is false. Note in NOTES.md that screen tests were skipped.
+
+## Nits
+
+- `queryKey: ["activity", tokenKey(token)]` is correct for token switching; also guard `token == null` (redirect via `_layout`, but the screen shouldn't crash if it renders first).
+- `items` `max(20)` is strict; if the API ever returns 21 on a bug the whole page errors. Consider `max(50)` for leniency — the UI only renders what it gets.
+- `nextCursor: ""` passes the schema but should be treated as "no more". Either `.min(1)` on the cursor or normalise `"" → null` in `getNextPageParam`.
+- `exchange` and `relatedId` rendering: no auto-linking in RN `Text` by default, so "plain text" is the default — but confirm no `onPress`/`Linking.openURL` is wired to API-provided values.
+- `limit=20` should be a named constant next to the schema.
+- The smoke test "a claim row opens its status" requires a claim in the test token's activity — if there isn't one, smoke test the row render and link target separately, and note it.
+- `getNextPageParam: (p) => p.nextCursor` is fine in v5, but write it as `(p) => p.nextCursor ?? undefined` if you make the cursor optional (S2), so `undefined` stops pagination unambiguously.
+- Date/time via `Intl.DateTimeFormat(locale)` — don't hand-format.
+- The activity `queryFn` should go through Task 2's `api(ActivityPageSchema, …)` so 401/429/`retryAfterMs` handling is shared, not re-implemented.
+
+## Cross-reference to the earlier review
+
+Still open and relevant here: **M2 (use `Date.parse` for `createdAt ≥ firstAttemptAt` in `findClaimInActivity`)** — the Activity item's `createdAt` feeds that comparison, so the string-vs-millis bug from the first review applies to this list too. And **N1 (surface `Idempotent-Replayed`)** is unaffected by Activity. The Activity plan correctly uses `relatedId` as the primary key for the `>10 min` claim fallback — that's a strict improvement over the earlier asset+amount matching, provided `parseSignedAmount` moves to Task 1 (M1).
+
+## Verdict
+
+Approve with M1–M4 fixed and S1–S2 verified or documented. M1 (move `parseSignedAmount` to Task 1) is the one that actually changes the build order; the rest are implementation traps that will produce plausible-looking but wrong output if missed. Keep the "cut if not deployed by 20:30" rule and publish the cut list before starting — the plan's 15-minute estimate is the least reliable part.
+
+
+
+
+> _[pasted text]_
+
+# Activity History — Design & Plan Review
+
+Approve with changes
+
+Verdict: This is a reasonable, tightly scoped 15-minute task. The design is significantly simpler than the claim flow, and I don't see a reason to redesign it.
+
+However, there are 3 important correctness issues and several smaller implementation gaps. Most can be fixed without significantly expanding the scope.
+
+I reviewed the design against the previous implementation plan. I couldn't independently retrieve the CashMine API documentation, so API-specific assumptions below are based on the contract you supplied.
+
+## Findings
+
+### P1 — 1. Asset decimals can come from the wrong account or an unavailable snapshot
+
+Location: Design → Money; Plan → Step 3.
+
+Activity items contain decimal strings but no asset precision. The plan proposes retrieving `decimals` from the balances snapshot.
+
+That is fine when balances are available for the same token, but consider:
+
+- The user navigates directly to `/activity` before Home loads.
+- The balances request fails while Activity succeeds.
+- The user switches tokens, and the balances cache contains data from the previous account.
+- Activity contains an asset not present in the current balances snapshot.
+
+The third case is particularly important: activity from token B must never be formatted using asset metadata cached under token A.
+
+Required change:
+
+Use balances metadata only from the same token-scoped query. Never use stale data from a previous token. When metadata is unavailable, display the validated original amount string exactly, without attempting precision conversion.
+
+Activity should remain usable even when the balances request fails.
+
+### P1 — 2. The `relatedId` → claim-status link assumes an undocumented relationship
+
+Location: Design → Claim row navigation.
+
+The plan states:
+
+> A claim row with `relatedId` links to `/claims/[id]`.
+
+But the supplied API item contract only specifies `relatedId: string | null`. It doesn't establish that `relatedId` is always the corresponding claim ID.
+
+If it identifies another activity item or a different entity, the resulting request to `GET /v1/claims/{id}` could return 404.
+
+Required change:
+
+Verify from the API contract that `relatedId` on `type === "claim"` contains a claim ID. Render the link only for claim rows with valid related IDs, and handle 404 on the destination screen.
+
+If the semantics cannot be verified within the time box, omit the link. Activity history does not depend on it.
+
+### P1 — 3. Pagination implementation is underspecified
+
+Location: Plan → Step 3.
+
+The proposed hook defines the key and pagination options:
+
+```
+useInfiniteQuery({
+  queryKey: ["activity", tokenKey(token)],
+  initialPageParam: null,
+  getNextPageParam: (p) => p.nextCursor,
+})
+```
+
+But it omits `queryFn`, which is required by TanStack Query.
+
+The implementation must explicitly:
+
+- Request `activity?limit=20` for the first page.
+- Send the opaque cursor unchanged, using `URLSearchParams` for encoding.
+- Pass `AbortSignal` to the request.
+- Disable fetching when there is no token.
+- Keep each request bound to the token associated with its query key.
+
+Suggested implementation:
+
+```
+useInfiniteQuery({
+  queryKey: ["activity", tokenKey(token)],
+  enabled: !!token,
+  initialPageParam: null as string | null,
+
+  queryFn: ({ pageParam, signal }) => {
+    const params = new URLSearchParams({
+      limit: "20",
+    });
+
+    if (pageParam !== null) {
+      params.set("cursor", pageParam);
+    }
+
+    return api(
+      ActivityPageSchema,
+      `activity?${params.toString()}`,
+      { signal }
+    );
+  },
+
+  getNextPageParam: (page) =>
+    page.nextCursor ?? undefined,
+});
+```
+
+This assumes the existing `api` function handles the authentication context correctly. Since the earlier implementation reads the token globally, pinning each request to the intended token still needs to be addressed. A token-scoped query key alone does not ensure correct authorization if the token changes between scheduling and dispatch.
+
+## Smaller findings
+
+### P2 — 4. Avoid adding a second sign to amounts
+
+Activity already returns signed amounts, such as `"-0.5"`.
+
+The green plus and red minus from the design should be icons or decorative indicators, not prefixes applied to the formatted amount.
+
+Format the parsed signed value directly. This avoids producing `"--0.5"` and handles unexpected type/sign combinations without changing the actual money value.
+
+Also test `"-0"` if preserving the original signed representation matters: converting it to `bigint` loses the negative sign.
+
+### P2 — 5. Parse errors need a defined fallback
+
+The Zod amount regex validates decimal syntax, but doesn't validate the number of fractional digits against an asset's precision.
+
+For example, a syntactically valid activity amount with 19 fractional digits will fail `parseSignedAmount(..., 18)`.
+
+Fix: If per-item parsing fails, don't call `formatAmount` on the failed result. Display the original validated API string with a safe fallback presentation, or explicitly show that the amount could not be formatted.
+
+### P2 — 6. Guard against repeated pagination cursors
+
+`nextCursor` is an opaque string.
+
+Prevent requesting another page when the server returns the same cursor as the page just requested. Otherwise, a backend pagination bug could repeatedly append the same records.
+
+Also require nonempty cursor strings in the schema and use stable `item.id` keys when rendering rows.
+
+### P2 — 7. Tests are missing from the execution plan
+
+Unlike the previous activity task, this version only specifies `pnpm check`, commit, and deploy.
+
+For a 15-minute feature, I would keep just these tests:
+
+| Test                             | Expected                               |
+| -------------------------------- | -------------------------------------- |
+| `parseSignedAmount("-0.5", 18)`  | Exact negative `bigint`                |
+| Next page has `nextCursor: null` | Load more disappears                   |
+| Second-page request fails        | Previously loaded rows remain          |
+| Token changes                    | Previous account activity is not shown |
+| Claim row has null `relatedId`   | No claim-status link                   |
+
+The last three are especially valuable because they exercise behavior that a successful first-page smoke test would miss.
+
+## What I would change in the plan
+
+Keep the same five steps, with three small amendments:
+
+1. Step 1: Implement `parseSignedAmount` and add its tests. Explicitly avoid double signs in the display.
+2. Step 2: Keep the schemas, but validate nonempty cursors, bound string lengths, and handle unknown types/statuses with a neutral presentation.
+3. Step 3: Specify `queryFn`, token-scoped requests, cursor encoding, a missing-metadata fallback, and inline pagination errors. Add focused pagination tests.
+
+Steps 4 and 5 can remain unchanged.
+
+## Final recommendation
+
+Proceed after those amendments.
+
+The underlying design choices are appropriate:
+
+- Manual Load more instead of infinite scrolling.
+- Strict monetary parsing using `bigint`.
+- Unknown status and type values rendered safely.
+- Earlier pages preserved after pagination errors.
+- Activity completely independent of the claim flow.
+
+Do not spend the 15-minute time box on additional abstractions or elaborate UI. Fix the account-scoping and pagination details, add a handful of targeted tests, and deploy.
+
+If the claim flow is not already working correctly, however, I would cut Activity as originally planned. It remains strictly lower priority than safe claim submission.
+
+
+
+here are my reviews
+
+## Claude
+
+I checked both reviews against the code that's already built. Most points were already handled, or the API docs settle them. Three cheap fixes are left, and I'm doing them now.
+
+**Already covered:**
+- **The first page sends no cursor:** `cursor=` is only added when there is one, and it's encoded.
+- **Token scoping:** each request carries the token explicitly, the query keys include the token's fingerprint, and decimals come from the same token's balances.
+- **Missing decimals or a failed parse:** the row shows the API's exact string instead of a guessed number.
+- **The `relatedId` link:** the docs say `relatedId` is the claim ID for claims you create, and the live claim (`clm_8cba…`) confirmed it. The link only appears on claim rows, and the status screen handles a 404.
+- **Ordering and the last page:** the docs say "newest first" and `nextCursor` is null on the last page. The live check confirmed Load more disappears.
+- **Retries:** they follow the shared policy, so a 401 doesn't retry and 429 waits are capped.
+- **Two error states:** a first-page failure shows the full error card, and a later-page failure shows an inline error while keeping the earlier rows.
+- **No double sign:** the signed amount is formatted as is, with only a color tint.
+- **Unknown type or status:** shown as raw text with a neutral badge.
+- **Obsolete point:** the review's first must-fix ("move `parseSignedAmount` into Task 1") assumed the old Activity-matching fallback, which the earlier review already removed.
+
+**Fixing now:**
+1. **No endless "Load more":** stop when a page comes back empty, the cursor repeats, or the cursor is `""`.
+2. **Lenient page size:** allow up to 50 items per page instead of exactly 20.
+3. **Tests:** the paging rule and the page schema.
+
+**Bash**: Add safe paging rule, lenient page size, tests; run checks
+
+```sh
+mkdir -p src/features/activity/__tests__ && cat > src/features/activity/paging.ts <<'EOF'
+import type { ActivityPage } from "@/features/api/schemas";
+
+/**
+ * The cursor for the next page, or undefined to stop. Stops on an empty page, an empty
+ * cursor, or a cursor equal to the one just used, so a server bug can't make
+ * "Load more" loop forever on the same records.
+ */
+export function nextActivityCursor(
+  page: ActivityPage,
+  lastCursor: string | null,
+): string | undefined {
+  if (page.items.length === 0 || !page.nextCursor || page.nextCursor === lastCursor) {
+    return undefined;
+  }
+  return page.nextCursor;
+}
+EOF
+cat > src/features/activity/__tests__/paging.test.ts <<'EOF'
+import { nextActivityCursor } from "@/features/activity/paging";
+import { ActivityPageSchema } from "@/features/api/schemas";
+
+const item = {
+  id: "act_1",
+  type: "accrual",
+  asset: "USDT",
+  amount: "9.81",
+  status: "confirmed",
+  exchange: "Binance",
+  createdAt: "2026-10-20T19:00:00.000Z",
+  relatedId: null,
+};
+
+describe("nextActivityCursor", () => {
+  it("follows the server's cursor", () => {
+    expect(nextActivityCursor({ items: [item], nextCursor: "c2" }, null)).toBe("c2");
+  });
+
+  it("stops on the last page, an empty page, an empty or repeated cursor", () => {
+    expect(nextActivityCursor({ items: [item], nextCursor: null }, "c1")).toBeUndefined();
+    expect(nextActivityCursor({ items: [], nextCursor: "c2" }, "c1")).toBeUndefined();
+    expect(nextActivityCursor({ items: [item], nextCursor: "" }, "c1")).toBeUndefined();
+    expect(nextActivityCursor({ items: [item], nextCursor: "c1" }, "c1")).toBeUndefined();
+  });
+});
+
+describe("ActivityPageSchema", () => {
+  it("accepts the documented last page and signed amounts", () => {
+    const page = { items: [{ ...item, type: "claim", amount: "-0.5", relatedId: "clm_1" }], nextCursor: null };
+    expect(ActivityPageSchema.parse(page)).toEqual(page);
+  });
+
+  it("keeps unknown types and statuses as text but rejects bad amounts", () => {
+    expect(ActivityPageSchema.safeParse({ items: [{ ...item, type: "bonus", status: "new" }], nextCursor: null }).success).toBe(true);
+    expect(ActivityPageSchema.safeParse({ items: [{ ...item, amount: "1e3" }], nextCursor: null }).success).toBe(false);
+    expect(ActivityPageSchema.safeParse({ items: [{ ...item, amount: 9.81 }], nextCursor: null }).success).toBe(false);
+  });
+});
+EOF
+python3 -I - <<'EOF'
+def rep(p, a, b):
+    s = open(p).read()
+    if a not in s: raise SystemExit(f"MISSING {p}: {a[:60]!r}")
+    open(p, "w").write(s.replace(a, b, 1))
+rep("src/features/api/schemas.ts", "items: z.array(ActivityItemSchema).max(20),", "items: z.array(ActivityItemSchema).max(50),")
+p = "src/features/activity/components/ActivityScreen.tsx"
+rep(p, "getNextPageParam: (page) => page.nextCursor ?? undefined,", "getNextPageParam: (page, _all, lastCursor) => nextActivityCursor(page, lastCursor),")
+rep(p, 'import { useBalances } from "@/features/balances/useBalances";', 'import { nextActivityCursor } from "@/features/activity/paging";\nimport { useBalances } from "@/features/balances/useBalances";')
+print("ok")
+EOF
+pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn|●"
+```
+
+<details><summary>output</summary>
+
+```
+ok
+$ oxlint --deny-warnings
+Tests:       68 passed, 68 total
+```
+
+</details>
+
+**Bash**: Record review outcome, commit, push, deploy
+
+```sh
+cat >> docs/superpowers/plans/2026-10-20-activity.md <<'EOF'
+
+## Review outcome (two external reviews, after the first build)
+
+Already handled in the build: no `cursor` on the first page (only added when set, encoded);
+requests carry their token explicitly and keys include the token fingerprint; decimals only from
+the same token's balances, otherwise (or on a parse failure) the exact API string is shown;
+`relatedId` is the claim id per the docs and the live test (link only on claim rows; the status
+screen handles 404); newest-first and `nextCursor: null` are documented and seen live; shared
+retry policy; first-page vs later-page errors; signed values formatted as-is (no double sign);
+unknown type/status shown as text with a neutral badge. Not applicable: moving
+`parseSignedAmount` for the activity-matching fallback (that fallback was removed earlier).
+
+Fixed: `nextActivityCursor` stops on an empty page, an empty or repeated cursor (no endless
+"Load more"); page size limit relaxed to 50; tests for the paging rule and the page schema.
+Skipped for time: screen tests for Activity (noted in NOTES.md).
+EOF
+git add -A src docs && git commit -q -m "fix: stop activity paging on empty pages and repeated cursors
+
+From the external review of the activity plan: guard against a server bug
+making Load more loop; relax the page size limit; test the paging rule and
+the page schema.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; pnpm export:web >/dev/null 2>&1 && ID=$(npx eas-cli@latest deploy --environment production --prod --non-interactive 2>&1 | grep -oE "cashmine-app--[a-z0-9]+" | head -1 | sed 's/cashmine-app--//'); npx eas-cli@latest deploy:alias --prod --id "$ID" --non-interactive 2>&1 | grep -iE "Production URL|error"; git log --oneline -1; date -u +%H:%M
+```
+
+<details><summary>output</summary>
+
+```
+Command was moved to the background (ID: b6cn7xfag) so that a message that arrived while it was running can reach you; it was not interrupted. Output is being written to: <scratchpad> You will be noti…
+```
+
+</details>
+
+**Bash**: Deduplicate activity items across pages, test, check
+
+```sh
+python3 -I - <<'EOF'
+def rep(p, a, b):
+    s = open(p).read()
+    if a not in s: raise SystemExit(f"MISSING {p}: {a[:60]!r}")
+    open(p, "w").write(s.replace(a, b, 1))
+rep("src/features/activity/paging.ts", "export function nextActivityCursor(", '''/**
+ * Joins pages, dropping repeated ids. New activity arriving between page loads shifts the
+ * newest-first list, so the next page can repeat an item already shown.
+ */
+export function mergeActivityPages(pages: ActivityPage[]): ActivityPage["items"] {
+  const seen = new Set<string>();
+  return pages
+    .flatMap((page) => page.items)
+    .filter((item) => (seen.has(item.id) ? false : (seen.add(item.id), true)));
+}
+
+export function nextActivityCursor(''')
+p = "src/features/activity/components/ActivityScreen.tsx"
+rep(p, "const items = query.data?.pages.flatMap((p) => p.items) ?? [];", "const items = query.data ? mergeActivityPages(query.data.pages) : [];")
+rep(p, 'import { nextActivityCursor } from "@/features/activity/paging";', 'import { mergeActivityPages, nextActivityCursor } from "@/features/activity/paging";')
+t = "src/features/activity/__tests__/paging.test.ts"
+rep(t, 'import { nextActivityCursor } from "@/features/activity/paging";', 'import { mergeActivityPages, nextActivityCursor } from "@/features/activity/paging";')
+s = open(t).read()
+s += '''
+describe("mergeActivityPages", () => {
+  it("drops an item repeated on the next page when the list shifted", () => {
+    const a = { ...item, id: "act_a" };
+    const b = { ...item, id: "act_b" };
+    const merged = mergeActivityPages([
+      { items: [a, b], nextCursor: "c2" },
+      { items: [b, { ...item, id: "act_c" }], nextCursor: null },
+    ]);
+    expect(merged.map((i) => i.id)).toEqual(["act_a", "act_b", "act_c"]);
+  });
+});
+'''
+open(t, "w").write(s)
+print("ok")
+EOF
+pnpm fmt >/dev/null 2>&1; pnpm check 2>&1 | grep -E "error|Tests:|warn|●"; tail -3 <scratchpad>
+```
+
+<details><summary>output</summary>
+
+```
+ok
+$ oxlint --deny-warnings
+Tests:       69 passed, 69 total
+20:19
+
+[exited with code 0]
+```
+
+</details>
+
+**Bash**: Commit, push and deploy the dedupe fix
+
+```sh
+git add -A src && git commit -q -m "fix: drop activity items repeated across pages
+
+New activity arriving between page loads shifts the newest-first list, so the
+next page repeated an item (seen as a duplicate React key while testing).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>" 2>&1 | grep -E "✗|error"; git push -q 2>&1|tail -1; pnpm export:web >/dev/null 2>&1 && ID=$(npx eas-cli@latest deploy --environment production --prod --non-interactive 2>&1 | grep -oE "cashmine-app--[a-z0-9]+" | head -1 | sed 's/cashmine-app--//'); npx eas-cli@latest deploy:alias --prod --id "$ID" --non-interactive 2>&1 | grep -iE "Production URL|error"; git log --oneline -1; date -u +%H:%M
+```
+
+<details><summary>output</summary>
+
+```
+Production URL  https://cashmine-app.expo.app
+3dbbe48 fix: drop activity items repeated across pages
+20:20
+```
+
+</details>
+
+## Claude
+
+Both fixes are live (20:20 UTC): duplicate rows in Activity are gone, and "Load more" can no longer loop.
+
+- **The duplicate-key warning:** it came from real pagination behavior. When new activity arrives between page loads, the newest-first list shifts and the next page repeats an item. The list now drops repeated IDs and keeps the first copy, with a test for exactly this case.
+- **From your reviews:** "Load more" stops on an empty page, an empty cursor or a repeated cursor, so a server bug can't make it loop. The page-size check also allows up to 50 items now.
+- **Recorded:** the outcome of both reviews is in the activity plan file, including which points were already handled and why one no longer applied.
+
+69 tests pass, and everything is pushed.
+
+The only remaining step is the final export of this conversation into `ai-logs/` at about 20:45, then one last push before 21:00. After that, nothing gets pushed or deployed. If anything else looks off on your phone before then, tell me now.
+
+## User
+
+lets review the requirements again and do a final sweep for any sensitive data
+
+## Claude
+
+I'll do both. First, the sensitive-data sweep across all current files, the entire git history, the built bundle that gets deployed, and the AI logs:
+
+**Bash**: Sweep files, history, bundle and EAS env for sensitive data
+
+```sh
+S=<scratchpad>
+P='ct[0-9]\.[A-Za-z0-9_-]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|gh[opsu]_[A-Za-z0-9]{20,}|m<user>|gmail\.com|<user>|<user>|/Users/[a-z]|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|BEGIN [A-Z ]*PRIVATE KEY|\bIvan\b'
+echo "== 1. tracked files now:"; git grep -nIiE "$P" -- . ':!pnpm-lock.yaml' | grep -viE "/users/me|ct\[0-9\]|lefthook.yml" | cut -c1-140 | head
+echo "== 2. every commit in history:"; git grep -lIiE "$P" $(git rev-list --all) -- . ':!pnpm-lock.yaml' 2>/dev/null | sed 's/^[0-9a-f]*://' | sort | uniq -c | head
+echo "== 3. env/secret files ever tracked:"; git log --all --name-only --format= | grep -iE "(^|/)\.env|\.pem$|\.key$|secret" | sort -u
+echo "== 4. deployed bundle (dist):"; pnpm export:web >/dev/null 2>&1; grep -rlIE "ct[0-9]\.[A-Za-z0-9_-]{20,}|EXPO_PUBLIC|API_TOKEN" dist | head; echo "(none above = clean)"
+echo "== 5. EAS env vars:"; for e in production preview; do npx eas-cli@latest env:list --environment $e 2>&1 | grep -E "^[A-Z_]+ |No variables|Name" | sed -E 's/(Value[^:]*:).*/\1 <hidden>/' | head -3; done
+```
+
+_(output omitted: lists unrelated personal data)_
+
+**Bash**: Show which patterns matched in history
+
+```sh
+P='ct[0-9]\.[A-Za-z0-9_-]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|gh[opsu]_[A-Za-z0-9]{20,}|m<user>|gmail\.com|<user>|<user>|/Users/[a-z]|split\W{0,3}scan|big\W{0,3}three|<previous project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|<other-project>|BEGIN [A-Z ]*PRIVATE KEY|\bIvan\b'; git grep -hoIiE "$P" $(git rev-list --all) -- ai-logs src 2>/dev/null | sort | uniq -c | sort -rn | head -15
+```
+
+_(output omitted: lists unrelated personal data)_
+
+**Bash**: Check commit cadence and notes length
+
+```sh
+git log --since="2026-10-20T19:00:00Z" --format='%cI' | sort | python3 -I -c "
+import sys, datetime as d
+t=[d.datetime.fromisoformat(l.strip()) for l in sys.stdin if l.strip()]
+start=d.datetime.fromisoformat('2026-10-20T19:00:00+00:00')
+gaps=[(b-a).total_seconds()/60 for a,b in zip([start]+t, t)]
+print('commits in slot:', len(t), '| first:', t[0].astimezone(d.timezone.utc).strftime('%H:%M'), '| last:', t[-1].astimezone(d.timezone.utc).strftime('%H:%M'), '| max gap (min):', round(max(gaps),1))
+"; wc -w NOTES.md | awk '{print "NOTES words:", $1}'; git log --oneline | wc -l | awk '{print "total commits:", $1}'
+```
+
+<details><summary>output</summary>
+
+```
+commits in slot: 22 | first: 19:14 | last: 20:19 | max gap (min): 14.3
+NOTES words: 872
+total commits: 34
+```
+
+</details>
+
+## Claude
+
+Every requirement in the brief is met, and the sweep found no secrets or private identifiers. The one open decision is whether to keep your personal email on the commits.
+
+**Requirements vs. the brief**
+
+| Brief | Status |
+|---|---|
+| Expo + TypeScript, web build designed for ~390 px phones | ✅ |
+| Token not in code, repo or build; asked for on first open, kept in the browser, can be changed | ✅ (bundle scanned: no token) |
+| API base URL in one place | ✅ `src/lib/config.ts` |
+| 1. Balances: per asset, USD total, freshness, loading, error and retry, refresh | ✅ tested live |
+| 2. Claim: asset, amount or Max, fee, amount received, confirm, follow until it settles, input checks | ✅ tested live, including a real recovery from an unclear answer |
+| 3. Unit tests: parsing, validation, fee, totals | ✅ 69 tests |
+| 4. Activity, paginated (if time) | ✅ |
+| Three decisions explained | ✅ `NOTES.md` |
+| At least two approaches for the balance after a claim, asked of the AI | ✅ in the log |
+| AI logs in `ai-logs/`, private data removed | ✅ |
+| Commit at least every 30 min, no squashing | ✅ 22 commits in the slot, longest gap 14 min, 34 commits in total |
+| `NOTES.md` with three sections; README with live link, run locally, what works | ✅ (NOTES is ~870 words, a little over a page) |
+| Public repo + live link before 21:00 | ✅ both live; final push about 20:45 |
+
+**Sensitive-data sweep**
+
+| Where | Result |
+|---|---|
+| Current files | Clean. The only identifier is the EAS owner `<expo-account>` in `app.config.ts`, which deploys need. |
+| Every commit in history | Clean. Never committed: the token, your name, email, local paths, other project or org names, the CashMine sender's name, or private keys. Only `.env.example` with placeholders was ever tracked. |
+| Deployed bundle (`dist/`) | No token, no `EXPO_PUBLIC_` values, no `API_TOKEN`. |
+| EAS environment variables | None set in production or preview. |
+| Commit hook | Blocks any `ct1.` token from being committed (it ran on every commit). |
+
+**The decision for you: your email on the commits.** All 34 commits list your personal Gmail as the author. It's git metadata rather than file content, so the sweep can't remove it.
+- **Keep it (my recommendation):** CashMine already has your email, since they wrote to you, and changing it now means a force-push of the whole history 40 minutes before the deadline.
+- **Or replace it:** I can switch every commit to your GitHub no-reply address and force-push. The commits and their times stay the same.
+
+**One note on the logs.** The brief says "do not tidy them up". The logs keep every prompt and reply as they were. Only private data is removed, long command output is shortened, and file writes show the file name instead of the full code. `ai-logs/README.md` says so.
+
+Next: the final log export at about 20:45, then the last push. Should the email stay as it is?
+
+## User
+
+keep the email, do the final export and push
+
