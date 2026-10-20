@@ -69,6 +69,28 @@ the new token (inspect real `fetch` headers); overlay equal-boundary (`createdAt
 completed-before-snapshot not in claiming; half-cent and total-rounded-once; `formatAmount` negative;
 amounts beyond `Number.MAX_SAFE_INTEGER`.
 
+### Final review (Fable) — binding, overrides everything above and below
+
+- **Removed from Task 4:** `canAutoReplay`, `findClaimInActivity`, the 10-min window, "Dismiss", and their tests.
+  409 → hard stop, pending **kept** (never `clearPending`). Review Focus #5 = "reload during an unresolved claim →
+  same key, body and token replayed; form stays locked until a response resolves it".
+- **Outcome rule:** `rejected` = any 4xx with a parseable error envelope **except 401, 409, 429** (server creates
+  no claim on 4xx) → clear pending, show the error. 401 / 409 → keep pending. 429 → wait (cap 10 s) and retry.
+  Everything else → `unknown`.
+- **Signatures everywhere follow "Review changes":** `storage.set(): boolean`; `api`/`apiWithMeta` take
+  `{ token }`; `PendingSubmission` has `tokenKey`; query keys include `tk`; local claims pruned only when
+  `createdAt ≤ asOf` (no 1 h rule).
+- **Web Locks:** sync ref lock + synchronous journal re-read before fetch; use `navigator.locks` only when present,
+  never block on its absence.
+- **Cut for time (record in NOTES "Not done"):** Home `useQueries` polling (Home invalidates balances on focus and
+  every 15 s; the status screen polls), 1 s freshness ticker (show "Updated at HH:MM:SS" + age on refetch),
+  pull-to-refresh, `ActivityPageSchema`/`parseSignedAmount`, Task 6, RNTL tests for Home/Claim screens (keep pure
+  module tests + one status-screen test), CLAUDE.md rewrite moves to Task 7.
+- **Tests kept from the review list:** unknown classification (502/408/bad 2xx body), 200 replay, 409/401 keep
+  pending, storage failure → no fetch, double Confirm → one key, overlay boundary, rounding (down, total once).
+- `mockFetch` gains `headers` (a real `Headers`) so `apiWithMeta` can read `Idempotent-Replayed`.
+- Storage-unavailable message says plainly: "Claims need browser storage (private browsing can block it)."
+
 ## Global Constraints
 
 - Deadline: last push and deploy before **21:00 UTC**. Commit ≥ every 30 min, conventional commits, no squash.
@@ -106,7 +128,7 @@ amounts beyond `Number.MAX_SAFE_INTEGER`.
 - `usdCents(amount: bigint, decimals: number, usdPrice: string): bigint` (rounds **down** to cents so a balance is never shown higher than it is; `usdPrice` parsed with the same strict parser at its own scale)
 - `formatUsd(cents: bigint, locale?: string): string` (Intl.NumberFormat with the bigint dollars part plus the 2-digit cents; no `Number()`)
 
-- [ ] **Step 1: Write failing tests** — `parseAmount`: `"0.5",18 → 500000000000000000n`; `"12",6 → 12000000n`; `".5" "1." "05" "1e-3" "" " 1" "-1"` → `format`; `"0.1234567",6 → too_many_decimals`. `formatAmount(1234500n,6) → "1.234500"`, trim → `"1.2345"`, `0n → "0"` (trim). `validateClaimAmount`: `"0" → zero`; below min; above available; `amount == fee → not_above_fee`; valid returns `receive = amount − fee` (e.g. ETH `"0.5"` fee `"0.0012"` → receive formats `"0.4988"`). `usdCents(820413207n,6,"1.0002") → 82058n` ($820.58); sum of several assets; `usdCents(1n,6,"0.004") → 0n`; `usdCents(999999n,6,"1") → 99n` (rounds down, not 100n); `formatUsd(123456789012345678n)` keeps every digit (no float loss).
+- [ ] **Step 1: Write failing tests** — `parseAmount`: `"0.5",18 → 500000000000000000n`; `"12",6 → 12000000n`; `".5" "1." "05" "1e-3" "" " 1" "-1"` → `format`; `"0.1234567",6 → too_many_decimals`. `formatAmount(1234500n,6) → "1.234500"`, trim → `"1.2345"`, `0n → "0"` (trim). `validateClaimAmount`: `"0" → zero`; below min; above available; `amount == fee → not_above_fee`; valid returns `receive = amount − fee` (e.g. ETH `"0.5"` fee `"0.0012"` → receive formats `"0.4988"`). `usdCents(820413207n,6,"1.0002") → 82057n` ($820.57, rounds down); sum of several assets; `usdCents(1n,6,"0.004") → 0n`; `usdCents(999999n,6,"1") → 99n` (rounds down, not 100n); `formatUsd(123456789012345678n)` keeps every digit (no float loss).
 - [ ] **Step 2:** `pnpm test src/features/money` → FAIL (module missing).
 - [ ] **Step 3:** Implement with string splitting + `BigInt`, no `Number` on amounts.
 - [ ] **Step 4:** Tests PASS.
