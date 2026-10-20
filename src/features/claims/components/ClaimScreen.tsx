@@ -138,10 +138,19 @@ export default function ClaimScreen({
         <Card className="rounded-2xl">
           <CardContent className="gap-3 pt-6">
             <Text variant="large">
-              {paused?.status === 409 ? t("claim.conflictTitle") : t("claim.unknownTitle")}
+              {paused?.status === 409
+                ? t("claim.conflictTitle")
+                : phase.kind === "submitting"
+                  ? t("claim.submitting")
+                  : t("claim.unknownTitle")}
             </Text>
             <Text variant="muted">
-              {t("claim.unknownBody", { amount: pending.body.amount, asset: pending.body.asset })}
+              {phase.kind === "submitting"
+                ? t("claim.sendingBody", { amount: pending.body.amount, asset: pending.body.asset })
+                : t("claim.unknownBody", {
+                    amount: pending.body.amount,
+                    asset: pending.body.asset,
+                  })}
             </Text>
             {paused ? (
               <Text className="text-destructive text-sm">

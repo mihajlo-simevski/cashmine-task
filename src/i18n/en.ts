@@ -74,6 +74,8 @@ const en = {
     confirm: "Confirm claim",
     edit: "Edit",
     submitting: "Sending your claim…",
+    sendingBody:
+      "Claiming {{amount}} {{asset}}. If the connection drops we retry with the same request, so it can't be claimed twice.",
     optionsError: "Couldn't load claim options for {{asset}}.",
     noDestinations: "There's nowhere to send {{asset}} yet.",
     nothingAvailable: "Nothing available to claim for {{asset}}.",
