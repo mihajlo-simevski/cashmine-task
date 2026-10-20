@@ -1,5 +1,6 @@
 import { Link } from "expo-router";
 import Head from "expo-router/head";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 
@@ -16,6 +17,17 @@ import PendingClaimBanner from "@/features/claims/components/PendingClaimBanner"
 import { formatUsd } from "@/features/money/amount";
 
 const STALE_AFTER_MS = 60_000;
+
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+    const id = setInterval(tick, intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
 
 function Freshness({ asOf, now }: { asOf: string; now: number }) {
   const { t } = useTranslation();
@@ -39,8 +51,8 @@ function Freshness({ asOf, now }: { asOf: string; now: number }) {
 export default function HomeScreen({ token }: { token: string }) {
   const { t } = useTranslation();
   const { query, adjusted, totalCents } = useBalances(token);
-  // Re-rendered on every refetch, so the age is current whenever new data arrives.
-  const now = query.dataUpdatedAt;
+  // A ticking clock, so data that stops refreshing (e.g. the API is down) shows its real age.
+  const now = Math.max(useNow(5000), query.dataUpdatedAt);
 
   return (
     <Screen>

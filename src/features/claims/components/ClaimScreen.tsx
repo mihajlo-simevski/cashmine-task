@@ -3,14 +3,13 @@ import { Link, router } from "expo-router";
 import Head from "expo-router/head";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
+import { TextInput, View } from "react-native";
 
 import ErrorState, { useErrorMessage } from "@/components/layout/ErrorState";
 import AppHeader from "@/components/layout/AppHeader";
 import Screen from "@/components/layout/Screen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
@@ -278,9 +277,10 @@ export default function ClaimScreen({
           <CardContent className="gap-3 pt-6">
             <Label nativeID="amount-label">{t("claim.amount")}</Label>
             <View className="h-14 flex-row items-center gap-2 rounded-xl border-[1.5px] border-primary pl-3.5 pr-1.5">
-              <Input
+              <TextInput
                 aria-labelledby="amount-label"
-                className="h-12 flex-1 border-0 bg-transparent px-0 text-2xl font-semibold shadow-none"
+                // A bare field: the bordered row around it is the visible input.
+                className="h-12 min-w-0 flex-1 bg-transparent text-2xl font-semibold text-foreground placeholder:text-muted-foreground web:outline-none"
                 value={amount}
                 onChangeText={(text) => {
                   setAmount(text.trim());

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "expo-router";
 import CircleCheck from "lucide-react-native/icons/circle-check";
 import CircleX from "lucide-react-native/icons/circle-x";
-import Loader from "lucide-react-native/icons/loader";
+import LoaderCircle from "lucide-react-native/icons/loader-circle";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Head from "expo-router/head";
 import { useEffect } from "react";
@@ -108,11 +108,11 @@ export default function ClaimStatusScreen({ token, id, replayed }: Props) {
                       ? CircleCheck
                       : claim.status === "failed"
                         ? CircleX
-                        : Loader
+                        : LoaderCircle
                   }
                   className={
                     claim.status === "pending"
-                      ? "size-5 text-accent-foreground"
+                      ? "size-5 animate-spin text-accent-foreground"
                       : "size-5 text-success-foreground"
                   }
                 />
