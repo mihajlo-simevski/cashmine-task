@@ -10,6 +10,65 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-20-payback-claims-design.md`
 
+## Review changes (binding — override the task text below where they differ)
+
+External review (three passes) accepted with these changes. Verified facts: CORS preflight from
+`https://cashmine-app.expo.app` allows `authorization, content-type, idempotency-key` and exposes
+`Retry-After, Idempotent-Replayed`. Docs: same key + same body → original claim (200 + `Idempotent-Replayed:
+true`), "never creates a second claim, even if the first response was lost"; status is `pending|completed|failed`;
+a claim leaves `available` at once and sits in `claiming` until it settles; activity `relatedId` = claim id.
+
+1. **Replay with the same key is the authoritative lookup.** Drop the 10-minute window and the activity-matching
+   fallback. An unresolved submission is never cleared by a timer or by "Dismiss"; it blocks new claims (all
+   assets, that token) until a response resolves it. "Check again" and resume-on-load replay the _same_ key, body
+   and token. Assumption (in NOTES): the server keeps keys at least as long as the token lives (24 h).
+2. **POST outcome classification defaults to `unknown`.** `created` = 201 or 200 with a body that passes
+   `ClaimSchema` (`replayed: boolean` from the header). `rejected` = 400 `VALIDATION` with a parseable envelope
+   only → clear pending, show field error. 401 → keep pending, paused, "token invalid" UI. 409 → keep pending,
+   hard error ("Something went wrong with this claim, contact support"), never a new key. Everything else
+   (any 5xx incl. 502, 408, 429 after cap, NETWORK/abort, JSON or schema failure on 2xx) → `unknown`.
+3. **Fail-closed journal.** `storage.set` returns `boolean`; `savePending` writes then reads back and compares.
+   If that fails, no request is sent and the UI says claims need browser storage. In-memory fallback only for
+   non-critical state.
+4. **Token bound to the submission.** `PendingSubmission` stores `tokenKey`; `api`/`apiWithMeta` take an
+   explicit `token` option; retries always send the token captured at Confirm. Changing token aborts the
+   running retry loop (AbortSignal) and leaves the journal under the old token. Query keys include the token
+   key: `["balances", tk]`, `["claim-options", tk, asset]`, `["claim", tk, id]`, `["activity", tk]`.
+5. **Single flight.** A synchronous ref lock is taken on the first Confirm tap, before key generation. Inside
+   it, `navigator.locks.request("claim:" + tk, { ifAvailable: true })` guards across tabs and the journal is
+   re-read; if a pending exists or the lock is unavailable, block. If `navigator.locks` is missing, block claims
+   (fail closed). Home also checks for a pending submission and shows a resume banner.
+6. **State-aware overlay, compared with `Date.parse`.** For local claims with `createdAt` (ms) > `asOf` (ms):
+   `pending` → available −amount, claiming +amount; `completed` → available −amount only; `failed` → nothing.
+   Claims with `createdAt ≤ asOf` are already in the snapshot (documented by the API) and are pruned from
+   storage then, not on a timer. Between settlement and the next snapshot (≤15 s) `claiming` is server truth
+   and may lag; Home shows the claim's live status next to it.
+7. **Home reconciles open claims.** Pending local claims are polled (`useQueries`, 2 s) from Home and the
+   status screen alike; polling continues while status is not `completed|failed` (no 20 s cut-off, back off
+   to 5 s after 60 s). Upsert the local claim _before_ clearing pending after a 201/200.
+8. **USD:** sum exact values at a common scale, then round **down once** for the total; per-asset values
+   round down individually (display only). `formatUsd` assembles the string from bigint (Intl for the integer
+   part with grouping, two-digit cents) — no `Number()`.
+9. **Strict schemas.** Amount strings must match the amount regex (non-negative); `decimals` int 0–36;
+   timestamps must `Date.parse` to a number; status enums; `usdPrice` decimal string. Invalid data → visible
+   data error, never zero or a guess. Add `parseSignedAmount` for activity.
+10. **Caps and details:** cap `retryAfterMs` at 10 s (beyond → `unknown`, "Check again"); revalidate amount
+    vs fresh options and adjusted available when Confirm is pressed; `useSyncExternalStore` snapshots are
+    cached per version; TanStack v5 object syntax (`useQuery({ queryKey, queryFn })`, `initialPageParam`);
+    validation order `format → too_many_decimals → zero → below_min → above_available → not_above_fee`;
+    Refresh button is primary, pull-to-refresh is a bonus.
+11. **Not adopted:** SHA-256 token fingerprint. The key is only a storage namespace and the token itself sits in
+    the same browser storage, so a cryptographic hash protects nothing here; FNV-1a stays.
+12. **Commits inside Task 4:** `submission.ts` + tests first (commit), then UI (commit). Draft NOTES.md during
+    test runs.
+
+New tests required (add to the owning task): 502 / 408 / 2xx-with-bad-body → `unknown`; 200 replay →
+`created` with `replayed: true` and no new `createdAt`; 409 and 401 keep pending; storage write failure →
+no fetch; double Confirm → one key; lock unavailable → blocked; token change mid-retry → retry never uses
+the new token (inspect real `fetch` headers); overlay equal-boundary (`createdAt == asOf` → no adjustment);
+completed-before-snapshot not in claiming; half-cent and total-rounded-once; `formatAmount` negative;
+amounts beyond `Number.MAX_SAFE_INTEGER`.
+
 ## Global Constraints
 
 - Deadline: last push and deploy before **21:00 UTC**. Commit ≥ every 30 min, conventional commits, no squash.

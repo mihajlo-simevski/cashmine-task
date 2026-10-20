@@ -8,6 +8,9 @@ pre-commit:
       run: zsh -c 'mise exec -- pnpm lint'
     typecheck:
       run: zsh -c 'mise exec -- pnpm typecheck'
+    # Block API tokens (ct1.<base64>...) from ever being committed.
+    no-tokens:
+      run: "! git diff --cached -U0 | grep -E '^\\+.*ct[0-9]\\.[A-Za-z0-9_-]{20,}'"
 
 commit-msg:
   commands:
