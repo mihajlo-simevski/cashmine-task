@@ -63,7 +63,8 @@ All in `ai-logs/02-build-session.md` unless noted.
 
 ## Not done / known issues
 
-- **Activity history** (optional) is not built.
+- **Activity** is basic: a "Load more" list (cursor paging); no filters, and amounts for an asset
+  missing from the balances list are shown as the raw string.
 - Home doesn't poll a pending claim's status; the status screen does, and Home reconciles via the
   15 s snapshot. After a claim settles, "being claimed" can lag up to one snapshot.
 - 409 and 429 paths and resume-after-reload are covered by unit tests but weren't exercised in the
@@ -71,4 +72,4 @@ All in `ai-logs/02-build-session.md` unless noted.
 - Pull-to-refresh isn't wired (there's a Refresh button). Light theme only.
 - Safari private mode can block storage; then claims are refused on purpose (stated on screen).
 
-Next: Activity with cursor paging, Home polling of open claims, screen tests for the claim flow.
+Next: Home polling of open claims, screen tests for the claim flow, activity filters.

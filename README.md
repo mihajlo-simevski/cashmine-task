@@ -22,7 +22,9 @@ screen. Decisions and known issues are in [`NOTES.md`](./NOTES.md).
   sent twice; the form stays locked until a definite answer arrives, even across reloads.
 - **Claim status:** polls until completed or failed; shows fee, amount received and the failure
   reason. A claim just made is reflected on Home right away and reconciled with the next snapshot.
-- **Tests:** 58 unit tests (`pnpm test`) for amount parsing, validation, fees, USD totals, the
+- **Activity:** newest-first history of accruals, reversals and claims with "Load more"
+  (cursor paging); a claim row opens its status.
+- **Tests:** 64 unit tests (`pnpm test`) for amount parsing, validation, fees, USD totals, the
   balance overlay, error mapping and the retry/idempotency logic.
 
 ## Run locally
