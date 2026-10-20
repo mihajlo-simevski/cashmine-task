@@ -62,11 +62,18 @@ export default function HomeScreen({ token }: { token: string }) {
       <AppHeader
         title={t("home.title")}
         right={
-          <Link href="/token" asChild>
-            <Button size="sm" variant="ghost">
-              <Text>{t("token.change")}</Text>
-            </Button>
-          </Link>
+          <View className="flex-row">
+            <Link href="/activity" asChild>
+              <Button size="sm" variant="ghost">
+                <Text className="text-accent-foreground">{t("activity.open")}</Text>
+              </Button>
+            </Link>
+            <Link href="/token" asChild>
+              <Button size="sm" variant="ghost">
+                <Text>{t("token.change")}</Text>
+              </Button>
+            </Link>
+          </View>
         }
       />
 

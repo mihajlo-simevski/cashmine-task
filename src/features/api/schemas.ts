@@ -59,3 +59,28 @@ export type Balances = z.infer<typeof BalancesSchema>;
 export type ClaimOptions = z.infer<typeof ClaimOptionsSchema>;
 export type Claim = z.infer<typeof ClaimSchema>;
 export type ClaimStatus = z.infer<typeof ClaimStatusSchema>;
+
+const signedAmount = z
+  .string()
+  .max(81)
+  .regex(/^-?(0|[1-9]\d*)(\.\d+)?$/);
+
+export const ActivityItemSchema = z.object({
+  id: z.string().min(1).max(100),
+  // Shown as plain text; unknown values are displayed as-is rather than rejected.
+  type: z.string().max(40),
+  asset,
+  amount: signedAmount,
+  status: z.string().max(40),
+  exchange: z.string().max(100).nullable(),
+  createdAt: timestamp,
+  relatedId: z.string().max(100).nullable(),
+});
+
+export const ActivityPageSchema = z.object({
+  items: z.array(ActivityItemSchema).max(20),
+  nextCursor: z.string().max(500).nullable(),
+});
+
+export type ActivityItem = z.infer<typeof ActivityItemSchema>;
+export type ActivityPage = z.infer<typeof ActivityPageSchema>;

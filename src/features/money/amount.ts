@@ -138,3 +138,11 @@ export function formatAmountShort(
   const cut = fraction.slice(0, maxDecimals).replace(/0+$/, "");
   return { text: cut ? `${whole}.${cut}` : whole, truncated: true };
 }
+
+/** Like parseAmount, but allows one leading "-" (activity amounts are signed). */
+export function parseSignedAmount(input: string, decimals: number): ParseResult {
+  const negative = input.startsWith("-");
+  const result = parseAmount(negative ? input.slice(1) : input, decimals);
+  if (!result.ok || !negative) return result;
+  return { ok: true, value: -result.value };
+}

@@ -1,6 +1,7 @@
 import {
   formatAmount,
   formatAmountShort,
+  parseSignedAmount,
   formatUsd,
   parseAmount,
   totalUsdCents,
@@ -138,5 +139,16 @@ describe("formatAmountShort", () => {
 
   it("drops trailing zeros after cutting", () => {
     expect(formatAmountShort(1000000000000001n, 18)).toEqual({ text: "0.001", truncated: true });
+  });
+});
+
+describe("parseSignedAmount", () => {
+  it("parses signed activity amounts exactly", () => {
+    expect(parseSignedAmount("-0.5", 18)).toEqual({ ok: true, value: -(5n * 10n ** 17n) });
+    expect(parseSignedAmount("9.81", 6)).toEqual({ ok: true, value: 9810000n });
+  });
+
+  it.each(["--1", "-", "+1", "- 1", "-.5"])("rejects %p", (input) => {
+    expect(parseSignedAmount(input, 6)).toEqual({ ok: false, error: "format" });
   });
 });

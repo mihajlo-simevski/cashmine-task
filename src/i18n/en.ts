@@ -101,6 +101,22 @@ const en = {
       not_above_fee: "The amount must be more than the {{fee}} {{asset}} fee.",
     },
   },
+  activity: {
+    title: "Activity",
+    open: "Activity",
+    empty: "No activity yet.",
+    loadError: "Couldn't load your activity.",
+    loadMore: "Load more",
+    loadingMore: "Loading…",
+    viewClaim: "View claim",
+    types: { accrual: "Payback earned", reversal: "Reversed", claim: "Claim" },
+    statuses: {
+      pending: "Pending",
+      confirmed: "Confirmed",
+      completed: "Completed",
+      failed: "Failed",
+    },
+  },
   status: {
     title: "Claim status",
     pending: "Processing",
