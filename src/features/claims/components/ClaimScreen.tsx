@@ -40,6 +40,31 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   );
 }
 
+function Summary({
+  fee,
+  receive,
+  destination,
+}: {
+  fee: string;
+  receive: string;
+  destination?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View className="gap-2.5 rounded-xl bg-muted p-3.5">
+      <Row label={t("claim.fee")} value={fee} />
+      <View className="h-px bg-border" />
+      <View className="flex-row items-baseline justify-between gap-2">
+        <Text variant="muted">{t("claim.receive")}</Text>
+        <Text className="min-w-0 flex-1 text-right text-xl font-bold" selectable>
+          {receive}
+        </Text>
+      </View>
+      {destination ? <Row label={t("claim.to")} value={destination} /> : null}
+    </View>
+  );
+}
+
 function goBack() {
   if (router.canGoBack()) router.back();
   else router.replace("/");
@@ -252,10 +277,10 @@ export default function ClaimScreen({
         <Card className="rounded-2xl">
           <CardContent className="gap-3 pt-6">
             <Label nativeID="amount-label">{t("claim.amount")}</Label>
-            <View className="flex-row gap-2">
+            <View className="h-14 flex-row items-center gap-2 rounded-xl border-[1.5px] border-primary pl-3.5 pr-1.5">
               <Input
                 aria-labelledby="amount-label"
-                className="flex-1"
+                className="h-12 flex-1 border-0 bg-transparent px-0 text-2xl font-semibold shadow-none"
                 value={amount}
                 onChangeText={(text) => {
                   setAmount(text.trim());
@@ -266,20 +291,26 @@ export default function ClaimScreen({
                 placeholder="0.0"
                 autoCorrect={false}
               />
+              <Text className="text-muted-foreground text-sm font-semibold">{balance.asset}</Text>
               <Button
-                variant="outline"
+                variant="ghost"
+                className="h-11 rounded-lg bg-accent px-3.5"
                 onPress={() => {
                   setAmount(formatAmount(rules.available, balance.decimals, { trim: true }));
                   setTouched(true);
                 }}
               >
-                <Text>{t("claim.max")}</Text>
+                <Text className="text-accent-foreground font-bold">{t("claim.max")}</Text>
               </Button>
             </View>
-            <Text variant="small" className="text-muted-foreground">
-              {t("claim.availableHint", { amount: fmt(rules.available), asset: balance.asset })} ·{" "}
-              {t("claim.minHint", { amount: fmt(rules.min), asset: balance.asset })}
-            </Text>
+            <View className="flex-row justify-between gap-2">
+              <Text className="text-muted-foreground min-w-0 flex-1 text-xs">
+                {t("claim.availableHint", { amount: fmt(rules.available), asset: balance.asset })}
+              </Text>
+              <Text className="text-muted-foreground text-right text-xs">
+                {t("claim.minHint", { amount: fmt(rules.min), asset: balance.asset })}
+              </Text>
+            </View>
             {touched && result && !result.ok ? (
               <Text className="text-destructive text-sm">{validationText(result.error)}</Text>
             ) : null}
@@ -300,14 +331,11 @@ export default function ClaimScreen({
               </View>
             ) : null}
 
-            <View className="gap-2 rounded-xl bg-muted p-3.5">
-              <Row label={t("claim.fee")} value={`${fmt(rules.fee)} ${balance.asset}`} />
-              <Row
-                label={t("claim.receive")}
-                value={result?.ok ? `${fmt(result.receive)} ${balance.asset}` : "—"}
-                strong
-              />
-            </View>
+            <Summary
+              fee={`${fmt(rules.fee)} ${balance.asset}`}
+              receive={result?.ok ? `${fmt(result.receive)} ${balance.asset}` : "—"}
+              destination={destination?.label}
+            />
             <Button
               size="lg"
               disabled={!result?.ok || !destination}
@@ -315,6 +343,7 @@ export default function ClaimScreen({
             >
               <Text>{t("claim.continue")}</Text>
             </Button>
+            <Text className="text-muted-foreground text-center text-xs">{t("claim.feeNote")}</Text>
           </CardContent>
         </Card>
       ) : rules && result?.ok && destination ? (
@@ -322,13 +351,11 @@ export default function ClaimScreen({
           <CardContent className="gap-3 pt-6">
             <Text variant="large">{t("claim.confirmTitle")}</Text>
             <Row label={t("claim.amount")} value={`${fmt(result.amount)} ${balance.asset}`} />
-            <Row label={t("claim.fee")} value={`${fmt(rules.fee)} ${balance.asset}`} />
-            <Row
-              label={t("claim.receive")}
-              value={`${fmt(result.receive)} ${balance.asset}`}
-              strong
+            <Summary
+              fee={`${fmt(rules.fee)} ${balance.asset}`}
+              receive={`${fmt(result.receive)} ${balance.asset}`}
+              destination={destination.label}
             />
-            <Row label={t("claim.destination")} value={destination.label} />
             <Button
               size="lg"
               disabled={phase.kind === "submitting"}

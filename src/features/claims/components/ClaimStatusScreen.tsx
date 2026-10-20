@@ -1,5 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "expo-router";
+import CircleCheck from "lucide-react-native/icons/circle-check";
+import CircleX from "lucide-react-native/icons/circle-x";
+import Loader from "lucide-react-native/icons/loader";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Head from "expo-router/head";
 import { useEffect } from "react";
@@ -88,39 +91,78 @@ export default function ClaimStatusScreen({ token, id, replayed }: Props) {
         />
       ) : (
         <Card className="rounded-2xl">
-          <CardContent className="gap-3 pt-6">
-            <Badge
-              className={
-                claim.status === "completed"
-                  ? "self-start border-transparent bg-success"
-                  : claim.status === "failed"
-                    ? "self-start"
-                    : "self-start border-transparent bg-accent"
-              }
-              variant={claim.status === "failed" ? "destructive" : "default"}
-            >
-              <Text
+          <CardContent className="gap-4 pt-6">
+            <View className="flex-row items-center gap-3">
+              <View
                 className={
                   claim.status === "completed"
-                    ? "text-success-foreground"
-                    : claim.status === "pending"
-                      ? "text-accent-foreground"
-                      : undefined
+                    ? "size-11 items-center justify-center rounded-full bg-success"
+                    : claim.status === "failed"
+                      ? "size-11 items-center justify-center rounded-full bg-destructive"
+                      : "size-11 items-center justify-center rounded-full bg-accent"
                 }
               >
-                {t(`status.${claim.status}`)}
-              </Text>
-            </Badge>
-            <Text variant="muted">
-              {claim.status === "pending"
-                ? t("status.pendingHint")
-                : claim.status === "completed"
-                  ? t("status.completedHint", { amount: claim.receiveAmount, asset: claim.asset })
-                  : t("status.failedHint", { amount: claim.amount, asset: claim.asset })}
-            </Text>
-            <Row label={t("status.amount")} value={`${claim.amount} ${claim.asset}`} />
-            <Row label={t("claim.fee")} value={`${claim.fee} ${claim.asset}`} />
-            <Row label={t("claim.receive")} value={`${claim.receiveAmount} ${claim.asset}`} />
+                <Icon
+                  as={
+                    claim.status === "completed"
+                      ? CircleCheck
+                      : claim.status === "failed"
+                        ? CircleX
+                        : Loader
+                  }
+                  className={
+                    claim.status === "pending"
+                      ? "size-5 text-accent-foreground"
+                      : "size-5 text-success-foreground"
+                  }
+                />
+              </View>
+              <View className="min-w-0 flex-1 gap-1">
+                <Badge
+                  className={
+                    claim.status === "completed"
+                      ? "self-start border-transparent bg-success"
+                      : claim.status === "failed"
+                        ? "self-start"
+                        : "self-start border-transparent bg-accent"
+                  }
+                  variant={claim.status === "failed" ? "destructive" : "default"}
+                >
+                  <Text
+                    className={
+                      claim.status === "completed"
+                        ? "text-success-foreground"
+                        : claim.status === "pending"
+                          ? "text-accent-foreground"
+                          : undefined
+                    }
+                  >
+                    {t(`status.${claim.status}`)}
+                  </Text>
+                </Badge>
+                <Text variant="muted" className="text-sm">
+                  {claim.status === "pending"
+                    ? t("status.pendingHint")
+                    : claim.status === "completed"
+                      ? t("status.completedHint", {
+                          amount: claim.receiveAmount,
+                          asset: claim.asset,
+                        })
+                      : t("status.failedHint", { amount: claim.amount, asset: claim.asset })}
+                </Text>
+              </View>
+            </View>
+            <View className="gap-2.5 rounded-xl bg-muted p-3.5">
+              <Row label={t("status.amount")} value={`${claim.amount} ${claim.asset}`} />
+              <Row label={t("claim.fee")} value={`${claim.fee} ${claim.asset}`} />
+              <View className="h-px bg-border" />
+              <View className="flex-row items-baseline justify-between gap-2">
+                <Text variant="muted">{t("claim.receive")}</Text>
+                <Text className="min-w-0 flex-1 text-right text-xl font-bold" selectable>
+                  {claim.receiveAmount} {claim.asset}
+                </Text>
+              </View>
+            </View>
             {claim.failureReason ? (
               <Row label={t("status.reason")} value={claim.failureReason} />
             ) : null}

@@ -69,6 +69,9 @@ const en = {
     fee: "Fee",
     receive: "You receive",
     destination: "Destination",
+    to: "To",
+    feeNote:
+      "The fee is taken from the amount. A claim can't be sent twice, even if the connection drops.",
     continue: "Continue",
     confirmTitle: "Confirm your claim",
     confirm: "Confirm claim",

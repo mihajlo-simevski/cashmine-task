@@ -81,23 +81,26 @@ export default function HomeScreen({ token }: { token: string }) {
               <Text variant="small" className="text-muted-foreground">
                 {t("home.totalHint")}
               </Text>
+              <View className="mb-1.5 mt-2.5 h-px bg-muted" />
+              <View className="flex-row items-center justify-between gap-2">
+                <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
+                  <View className="size-2 rounded-full bg-primary" />
+                  <View className="min-w-0 flex-1">
+                    <Freshness asOf={query.data.asOf} now={now} />
+                  </View>
+                </View>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-full"
+                  disabled={query.isFetching}
+                  onPress={() => void query.refetch()}
+                >
+                  <Text>{query.isFetching ? t("home.refreshing") : t("home.refresh")}</Text>
+                </Button>
+              </View>
             </CardContent>
           </Card>
-
-          <View className="flex-row items-center justify-between gap-2">
-            <View className="min-w-0 flex-1">
-              <Freshness asOf={query.data.asOf} now={now} />
-            </View>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="rounded-full"
-              disabled={query.isFetching}
-              onPress={() => void query.refetch()}
-            >
-              <Text>{query.isFetching ? t("home.refreshing") : t("home.refresh")}</Text>
-            </Button>
-          </View>
 
           {query.isError ? (
             <ErrorState
