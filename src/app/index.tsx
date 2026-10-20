@@ -1,3 +1,6 @@
-import SetupCheckScreen from "@/features/setup/components/SetupCheckScreen";
+import HomeScreen from "@/features/balances/components/HomeScreen";
+import RequireToken from "@/features/token/components/RequireToken";
 
-export default SetupCheckScreen;
+export default function Index() {
+  return <RequireToken>{(token) => <HomeScreen token={token} />}</RequireToken>;
+}
