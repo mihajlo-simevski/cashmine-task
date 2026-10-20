@@ -15,7 +15,7 @@
 - Deadline: last push and deploy before **21:00 UTC**. Commit ≥ every 30 min, conventional commits, no squash.
 - API base URL only in `src/lib/config.ts`: `export const API_BASE_URL = "https://task-api.cashmine.io";`
 - Token never in code, repo, env vars or build. Stored in browser storage only.
-- No floats in money math: `bigint` minor units. Amount regex `^(0|[1-9]\d*)(\.\d+)?$`, ≤ `decimals` fraction digits.
+- No floats in money math: `bigint` minor units. Never `Number()`/`parseFloat` on an amount or price, not even for display (loses precision past ~15 digits; accepts "1e5", " ", "0x10"). Amount regex `^(0|[1-9]\d*)(\.\d+)?$`, ≤ `decimals` fraction digits.
 - All strings via `src/i18n/en.ts`; semantic colour tokens; `Text` from `@/components/ui/text`; icons one-by-one import.
 - API data is untrusted: render as plain text only; never open URLs from it.
 - Browser storage access wrapped in try/catch (works when storage is unavailable).
@@ -44,10 +44,10 @@
 - `formatAmount(value: bigint, decimals: number, opts?: { trim?: boolean }): string` (exact; `trim` drops trailing fraction zeros; negative values keep `-`)
 - `type ClaimAmountError = "format" | "too_many_decimals" | "zero" | "below_min" | "above_available" | "not_above_fee"`
 - `validateClaimAmount(input: string, rules: { decimals: number; min: bigint; fee: bigint; available: bigint }): { ok: true; amount: bigint; receive: bigint } | { ok: false; error: ClaimAmountError }`
-- `usdCents(amount: bigint, decimals: number, usdPrice: string): bigint` (half-up rounding to cents; `usdPrice` parsed with the same strict parser at its own scale)
-- `formatUsd(cents: bigint, locale?: string): string` (Intl.NumberFormat, USD)
+- `usdCents(amount: bigint, decimals: number, usdPrice: string): bigint` (rounds **down** to cents so a balance is never shown higher than it is; `usdPrice` parsed with the same strict parser at its own scale)
+- `formatUsd(cents: bigint, locale?: string): string` (Intl.NumberFormat with the bigint dollars part plus the 2-digit cents; no `Number()`)
 
-- [ ] **Step 1: Write failing tests** — `parseAmount`: `"0.5",18 → 500000000000000000n`; `"12",6 → 12000000n`; `".5" "1." "05" "1e-3" "" " 1" "-1"` → `format`; `"0.1234567",6 → too_many_decimals`. `formatAmount(1234500n,6) → "1.234500"`, trim → `"1.2345"`, `0n → "0"` (trim). `validateClaimAmount`: `"0" → zero`; below min; above available; `amount == fee → not_above_fee`; valid returns `receive = amount − fee` (e.g. ETH `"0.5"` fee `"0.0012"` → receive formats `"0.4988"`). `usdCents(820413207n,6,"1.0002") → 82058n` ($820.58); sum of several assets; `usdCents(1n,6,"0.004") → 0n`.
+- [ ] **Step 1: Write failing tests** — `parseAmount`: `"0.5",18 → 500000000000000000n`; `"12",6 → 12000000n`; `".5" "1." "05" "1e-3" "" " 1" "-1"` → `format`; `"0.1234567",6 → too_many_decimals`. `formatAmount(1234500n,6) → "1.234500"`, trim → `"1.2345"`, `0n → "0"` (trim). `validateClaimAmount`: `"0" → zero`; below min; above available; `amount == fee → not_above_fee`; valid returns `receive = amount − fee` (e.g. ETH `"0.5"` fee `"0.0012"` → receive formats `"0.4988"`). `usdCents(820413207n,6,"1.0002") → 82058n` ($820.58); sum of several assets; `usdCents(1n,6,"0.004") → 0n`; `usdCents(999999n,6,"1") → 99n` (rounds down, not 100n); `formatUsd(123456789012345678n)` keeps every digit (no float loss).
 - [ ] **Step 2:** `pnpm test src/features/money` → FAIL (module missing).
 - [ ] **Step 3:** Implement with string splitting + `BigInt`, no `Number` on amounts.
 - [ ] **Step 4:** Tests PASS.

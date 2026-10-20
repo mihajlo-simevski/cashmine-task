@@ -60,7 +60,7 @@ updating — feels broken).
   conversion. `receive = amount − fee`. Validation errors: `format`, `too_many_decimals`, `zero`,
   `below_min`, `above_available`, `not_above_fee` (receive must be > 0).
 - **USD:** `usdPrice` is parsed as a scaled bigint too; per-asset value and the total are computed in bigint
-  and rounded half-up to cents only for display. **Total = Σ (available + pending)** in USD ("your
+  and rounded **down** to cents only for display (never show more than the user has; lesson from previous experience). **Total = Σ (available + pending)** in USD ("your
   payback"); claiming is shown separately as "being claimed" because it is leaving.
 - **Unknown claim outcome** (client timeout ~15 s via AbortController, network error, 500, 503, 504): the
   Idempotency-Key (`crypto.randomUUID()`) and body are created when the user taps Confirm and saved to
@@ -93,6 +93,8 @@ updating — feels broken).
 - **Screens/routes:** `/` Home (gated by token), `/token` set/change token, `/claim` (optional
   `?asset=`), `/claims/[id]` status, `/activity` (if time). Confirmation is a step inside `/claim`, not a
   separate route.
+
+- **Lessons from previous experience:** no `Number()`/`parseFloat` on amounts even when formatting; round displayed values down; conversions to minor units are exact (reject, never round); the Idempotency-Key is persisted before the request and a retry adopts the existing result.
 
 ## Left to the builder
 
