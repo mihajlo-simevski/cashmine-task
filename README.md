@@ -1,56 +1,56 @@
-# Welcome to your Expo app 👋
+# CashMine Task
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A small slice of the CashMine app, built with Expo (React Native + TypeScript) and delivered as a mobile web app.
 
-## Get started
+**Live:** https://cashmine-app.expo.app (open on a phone)
 
-1. Install dependencies
+## Stack
 
-   ```bash
-   npm install
-   ```
+- Expo SDK 57, Expo Router (file-based routes in `src/app`)
+- NativeWind 4 (Tailwind CSS) + react-native-reusables (shadcn/ui for React Native), lucide icons
+- TanStack Query for server state, zod for response validation, react-hook-form for forms
+- i18next for copy, Jest + React Native Testing Library for tests
+- EAS Hosting (static pages + server API routes)
 
-2. Start the app
+## How the API is called
 
-   ```bash
-   npx expo start
-   ```
+The browser never talks to the API directly and never sees the API token.
+Client code calls `/api/proxy/<path>`. That Expo API route (`src/app/api/proxy/[...path]+api.ts`) runs on the server, adds the token from a server-only environment variable and forwards the request. Responses are validated with zod before they reach the UI.
 
-In the output, you'll find options to open the app in a
+## Run locally
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Requires Node 24 and pnpm 11.
 
 ```bash
-npm run reset-project
+pnpm install
+cp .env.example .env.local   # fill in API_BASE_URL and API_TOKEN
+pnpm web                     # http://localhost:8081
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Checks
 
-### Other setup steps
+```bash
+pnpm check   # lint (oxlint) + format (oxfmt) + typecheck + tests
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Deploy
 
-## Learn more
+```bash
+pnpm deploy:web:prod   # export + deploy to EAS Hosting (production env vars)
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Project layout
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+src/app/                 routes (screens, layouts, API routes)
+src/features/<domain>/   screens and logic per feature
+src/components/ui/       UI primitives (react-native-reusables)
+src/components/layout/   page chrome
+src/lib/                 API client, query client, utilities
+src/i18n/                strings
+ai-logs/                 AI conversations used to build this
+```
 
-## Join the community
+## AI usage
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+AI tools were used to write code. The conversations are in [`ai-logs/`](./ai-logs), with secrets removed.
