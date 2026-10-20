@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 
 import ErrorState, { useErrorMessage } from "@/components/layout/ErrorState";
+import AppHeader from "@/components/layout/AppHeader";
 import Screen from "@/components/layout/Screen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -117,12 +118,14 @@ export default function ClaimScreen({
       <Head>
         <title>{t("claim.title")}</title>
       </Head>
-      <View className="flex-row items-center justify-between">
-        <Text variant="h3">{t("claim.title")}</Text>
-        <Button size="sm" variant="ghost" onPress={goBack}>
-          <Text>{t("common.back")}</Text>
-        </Button>
-      </View>
+      <AppHeader
+        title={t("claim.title")}
+        right={
+          <Button size="sm" variant="ghost" onPress={goBack}>
+            <Text className="text-accent-foreground">{t("common.back")}</Text>
+          </Button>
+        }
+      />
     </>
   );
 
@@ -132,7 +135,7 @@ export default function ClaimScreen({
     return (
       <Screen>
         {header}
-        <Card>
+        <Card className="rounded-2xl">
           <CardContent className="gap-3 pt-6">
             <Text variant="large">
               {paused?.status === 409 ? t("claim.conflictTitle") : t("claim.unknownTitle")}
@@ -207,6 +210,7 @@ export default function ClaimScreen({
             <Button
               key={b.asset}
               size="sm"
+              className="rounded-full px-4"
               variant={b.asset === selectedAsset ? "default" : "outline"}
               disabled={step === "confirm"}
               onPress={() => {
@@ -236,7 +240,7 @@ export default function ClaimScreen({
       ) : balance.available === 0n ? (
         <Text variant="muted">{t("claim.nothingAvailable", { asset: selectedAsset })}</Text>
       ) : rules && step === "form" ? (
-        <Card>
+        <Card className="rounded-2xl">
           <CardContent className="gap-3 pt-6">
             <Label nativeID="amount-label">{t("claim.amount")}</Label>
             <View className="flex-row gap-2">
@@ -287,19 +291,25 @@ export default function ClaimScreen({
               </View>
             ) : null}
 
-            <Row label={t("claim.fee")} value={`${fmt(rules.fee)} ${balance.asset}`} />
-            <Row
-              label={t("claim.receive")}
-              value={result?.ok ? `${fmt(result.receive)} ${balance.asset}` : "—"}
-              strong
-            />
-            <Button disabled={!result?.ok || !destination} onPress={() => setStep("confirm")}>
+            <View className="gap-2 rounded-xl bg-muted p-3.5">
+              <Row label={t("claim.fee")} value={`${fmt(rules.fee)} ${balance.asset}`} />
+              <Row
+                label={t("claim.receive")}
+                value={result?.ok ? `${fmt(result.receive)} ${balance.asset}` : "—"}
+                strong
+              />
+            </View>
+            <Button
+              size="lg"
+              disabled={!result?.ok || !destination}
+              onPress={() => setStep("confirm")}
+            >
               <Text>{t("claim.continue")}</Text>
             </Button>
           </CardContent>
         </Card>
       ) : rules && result?.ok && destination ? (
-        <Card>
+        <Card className="rounded-2xl">
           <CardContent className="gap-3 pt-6">
             <Text variant="large">{t("claim.confirmTitle")}</Text>
             <Row label={t("claim.amount")} value={`${fmt(result.amount)} ${balance.asset}`} />
@@ -311,6 +321,7 @@ export default function ClaimScreen({
             />
             <Row label={t("claim.destination")} value={destination.label} />
             <Button
+              size="lg"
               disabled={phase.kind === "submitting"}
               onPress={() => {
                 // Re-check against the latest balance and options at the moment of confirming.

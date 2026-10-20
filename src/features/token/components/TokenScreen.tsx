@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 
+import AppHeader from "@/components/layout/AppHeader";
 import Screen from "@/components/layout/Screen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,10 +43,8 @@ export default function TokenScreen() {
       <Head>
         <title>{t("token.title")}</title>
       </Head>
-      <View className="gap-2">
-        <Text variant="h3">{t("token.title")}</Text>
-        <Text variant="muted">{t("token.description")}</Text>
-      </View>
+      <AppHeader title={t("token.title")} />
+      <Text variant="muted">{t("token.description")}</Text>
       {token ? (
         <Text variant="small" className="text-muted-foreground">
           {t("token.current", { masked: maskToken(token) })}
@@ -74,7 +73,7 @@ export default function TokenScreen() {
           {t("token.storageWarning")}
         </Text>
       ) : null}
-      <Button onPress={storageBlocked ? () => router.replace("/") : save}>
+      <Button size="lg" onPress={storageBlocked ? () => router.replace("/") : save}>
         <Text>{storageBlocked ? t("common.goHome") : t("token.save")}</Text>
       </Button>
       {token && !storageBlocked ? (

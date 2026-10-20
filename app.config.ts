@@ -7,7 +7,7 @@ const config: ExpoConfig = {
   scheme: "cashminetask",
   version: "1.0.0",
   icon: "./assets/images/icon.png",
-  userInterfaceStyle: "automatic",
+  userInterfaceStyle: "light",
   web: {
     bundler: "metro",
     // "server" so API routes (src/app/api) run on EAS Hosting. HTML is still pre-rendered at export.

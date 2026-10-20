@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 
 import ErrorState from "@/components/layout/ErrorState";
+import AppHeader from "@/components/layout/AppHeader";
 import Screen from "@/components/layout/Screen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,14 +47,16 @@ export default function HomeScreen({ token }: { token: string }) {
       <Head>
         <title>{t("home.title")}</title>
       </Head>
-      <View className="flex-row items-center justify-between">
-        <Text variant="h3">{t("home.title")}</Text>
-        <Link href="/token" asChild>
-          <Button size="sm" variant="ghost">
-            <Text>{t("token.change")}</Text>
-          </Button>
-        </Link>
-      </View>
+      <AppHeader
+        title={t("home.title")}
+        right={
+          <Link href="/token" asChild>
+            <Button size="sm" variant="ghost">
+              <Text>{t("token.change")}</Text>
+            </Button>
+          </Link>
+        }
+      />
 
       <PendingClaimBanner token={token} />
 
@@ -71,12 +74,10 @@ export default function HomeScreen({ token }: { token: string }) {
         />
       ) : adjusted && totalCents !== undefined && query.data ? (
         <>
-          <Card>
+          <Card className="rounded-2xl">
             <CardContent className="gap-1 pt-6">
               <Text variant="muted">{t("home.total")}</Text>
-              <Text variant="h2" className="border-0 pb-0">
-                {formatUsd(totalCents)}
-              </Text>
+              <Text className="text-4xl font-bold tracking-tight">{formatUsd(totalCents)}</Text>
               <Text variant="small" className="text-muted-foreground">
                 {t("home.totalHint")}
               </Text>
@@ -89,7 +90,8 @@ export default function HomeScreen({ token }: { token: string }) {
             </View>
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
+              className="rounded-full"
               disabled={query.isFetching}
               onPress={() => void query.refetch()}
             >

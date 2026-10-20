@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 
 import ErrorState from "@/components/layout/ErrorState";
+import AppHeader from "@/components/layout/AppHeader";
 import Screen from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,7 @@ export default function ClaimStatusScreen({ token, id, replayed }: Props) {
       <Head>
         <title>{t("status.title")}</title>
       </Head>
-      <Text variant="h3">{t("status.title")}</Text>
+      <AppHeader title={t("status.title")} />
       {replayed ? <Text variant="muted">{t("status.replayed")}</Text> : null}
 
       {query.isPending ? (
@@ -77,19 +78,29 @@ export default function ClaimStatusScreen({ token, id, replayed }: Props) {
           onRetry={() => void query.refetch()}
         />
       ) : (
-        <Card>
+        <Card className="rounded-2xl">
           <CardContent className="gap-3 pt-6">
             <Badge
-              className="self-start"
-              variant={
-                claim.status === "failed"
-                  ? "destructive"
-                  : claim.status === "completed"
-                    ? "default"
-                    : "secondary"
+              className={
+                claim.status === "completed"
+                  ? "self-start border-transparent bg-success"
+                  : claim.status === "failed"
+                    ? "self-start"
+                    : "self-start border-transparent bg-accent"
               }
+              variant={claim.status === "failed" ? "destructive" : "default"}
             >
-              <Text>{t(`status.${claim.status}`)}</Text>
+              <Text
+                className={
+                  claim.status === "completed"
+                    ? "text-success-foreground"
+                    : claim.status === "pending"
+                      ? "text-accent-foreground"
+                      : undefined
+                }
+              >
+                {t(`status.${claim.status}`)}
+              </Text>
             </Badge>
             <Text variant="muted">
               {claim.status === "pending"
@@ -109,7 +120,7 @@ export default function ClaimStatusScreen({ token, id, replayed }: Props) {
       )}
 
       <Link href="/" asChild>
-        <Button variant="outline">
+        <Button variant="outline" size="lg">
           <Text>{t("status.done")}</Text>
         </Button>
       </Link>
