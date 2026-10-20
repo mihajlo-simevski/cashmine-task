@@ -70,11 +70,24 @@ updating — feels broken).
   claim is impossible until it resolves. On reload, a saved unresolved submission is resumed first.
   400 → field error on the form; 409 → treated as a bug, clear the submission and show an error;
   401 → "token invalid or expired" with a link to change it.
+  - _Key lifetime is undocumented_, so replay is only automatic within **10 minutes** of the first attempt.
+    After that the app does not replay. It looks in `/v1/activity` for a `claim` with the same asset and
+    amount created after the saved time; if found it treats that as the result, otherwise it shows
+    "We couldn't confirm this claim" with a link to Activity and a "Dismiss" button. (The API has no claims
+    list or lookup by key; activity is the only fallback.)
+  - Unresolved submissions and local claims are **stored per token** (keyed by a hash of the token), so
+    changing the token never discards the protection; switching back resumes it.
 - **Claim tracking:** `/claims/[id]` polls `GET /v1/claims/{id}` every 2 s until `completed`/`failed`
   (~20 s), showing amount, fee, receive amount, status and `failureReason`. Updates the local claim's status.
 - **Queries:** balances refetch every 15 s while Home is visible; retries on 429/5xx/504/network with
-  `retryAfterMs` when given; no retry on other 4xx. Changing the token clears the query cache and local
-  claims for the old token.
+  `retryAfterMs` when given; no retry on other 4xx. Changing the token clears the query cache (local
+  claims stay stored under the old token's key).
+- **Snapshot assumption:** the docs say a new claim "may not show up until the next" snapshot, so a snapshot
+  with `asOf ≥ claim.createdAt` is assumed to include it (in `claiming`, then out on completion, back to
+  `available` on failure). The overlay therefore keys only on `asOf` vs `createdAt`. Written in NOTES.md as
+  an assumption.
+- **Time budget (19:15 → 21:00 UTC):** Activity is the last task and is cut if the claim flow isn't done and
+  deployed by ~20:25. NOTES.md, README and the final AI-log export are reserved for the last 20 minutes.
 - **Errors:** `ApiError` parses the envelope `{error:{code,message,field?,retryAfterMs?}}`; UI shows our own
   i18n message per code (the API's `message` may be shown as secondary plain text).
 - **Screens/routes:** `/` Home (gated by token), `/token` set/change token, `/claim` (optional
