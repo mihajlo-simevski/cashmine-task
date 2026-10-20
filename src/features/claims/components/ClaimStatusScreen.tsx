@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "expo-router";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Head from "expo-router/head";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +12,7 @@ import Screen from "@/components/layout/Screen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 import { ClaimSchema } from "@/features/api/schemas";
@@ -67,7 +69,14 @@ export default function ClaimStatusScreen({ token, id, replayed }: Props) {
         <title>{t("status.title")}</title>
       </Head>
       <AppHeader title={t("status.title")} />
-      {replayed ? <Text variant="muted">{t("status.replayed")}</Text> : null}
+      {replayed ? (
+        <View className="flex-row items-center gap-2 rounded-xl border border-success bg-card px-3 py-2.5">
+          <Icon as={ShieldCheck} className="size-4 text-success" />
+          <Text className="min-w-0 flex-1 text-sm font-medium text-success">
+            {t("status.replayed")}
+          </Text>
+        </View>
+      ) : null}
 
       {query.isPending ? (
         <Skeleton className="h-56 w-full" />
