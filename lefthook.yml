@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      run: zsh -c 'mise exec -- pnpm fmt'
+      stage_fixed: true
+    lint:
+      run: zsh -c 'mise exec -- pnpm lint'
+    typecheck:
+      run: zsh -c 'mise exec -- pnpm typecheck'
+
+commit-msg:
+  commands:
+    commitlint:
+      run: zsh -c 'mise exec -- pnpm commitlint --edit $1'
