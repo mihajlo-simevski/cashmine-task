@@ -1,4 +1,4 @@
-import { nextActivityCursor } from "@/features/activity/paging";
+import { mergeActivityPages, nextActivityCursor } from "@/features/activity/paging";
 import { ActivityPageSchema } from "@/features/api/schemas";
 
 const item = {
@@ -49,5 +49,17 @@ describe("ActivityPageSchema", () => {
       ActivityPageSchema.safeParse({ items: [{ ...item, amount: 9.81 }], nextCursor: null })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("mergeActivityPages", () => {
+  it("drops an item repeated on the next page when the list shifted", () => {
+    const a = { ...item, id: "act_a" };
+    const b = { ...item, id: "act_b" };
+    const merged = mergeActivityPages([
+      { items: [a, b], nextCursor: "c2" },
+      { items: [b, { ...item, id: "act_c" }], nextCursor: null },
+    ]);
+    expect(merged.map((i) => i.id)).toEqual(["act_a", "act_b", "act_c"]);
   });
 });

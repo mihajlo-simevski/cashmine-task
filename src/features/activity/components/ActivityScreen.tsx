@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 import { type ActivityItem, ActivityPageSchema } from "@/features/api/schemas";
-import { nextActivityCursor } from "@/features/activity/paging";
+import { mergeActivityPages, nextActivityCursor } from "@/features/activity/paging";
 import { useBalances } from "@/features/balances/useBalances";
 import { parseSignedAmount } from "@/features/money/amount";
 import Amount from "@/features/money/components/Amount";
@@ -102,7 +102,7 @@ export default function ActivityScreen({ token }: { token: string }) {
     getNextPageParam: (page, _all, lastCursor) => nextActivityCursor(page, lastCursor),
   });
 
-  const items = query.data?.pages.flatMap((p) => p.items) ?? [];
+  const items = query.data ? mergeActivityPages(query.data.pages) : [];
 
   return (
     <Screen>
