@@ -9,14 +9,14 @@ const AUTH_HEADER = "authorization";
 const formatToken = (token: string) => `Bearer ${token}`;
 
 const FORWARDED_REQUEST_HEADERS = ["accept", "accept-language", "content-type", "idempotency-key"];
-// fetch() already decoded the body, so the encoding/length headers would be wrong.
-const DROPPED_RESPONSE_HEADERS = [
-  "content-encoding",
-  "content-length",
-  "transfer-encoding",
-  "connection",
-  "set-cookie",
-];
+// Only these upstream headers reach the browser. Everything else (cookies, redirects,
+// encoding headers that no longer match the decoded body) is dropped.
+const FORWARDED_RESPONSE_HEADERS = ["content-type", "cache-control", "etag"];
+// The upstream API is untrusted: stop the browser from running anything it returns.
+const SAFETY_HEADERS = {
+  "content-security-policy": "default-src 'none'; sandbox",
+  "x-content-type-options": "nosniff",
+};
 
 async function forward(request: Request): Promise<Response> {
   const baseUrl = process.env.API_BASE_URL;
@@ -36,14 +36,24 @@ async function forward(request: Request): Promise<Response> {
   headers.set(AUTH_HEADER, formatToken(token));
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
-  const upstream = await fetch(target, {
-    method: request.method,
-    headers,
-    body: hasBody ? await request.text() : undefined,
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method: request.method,
+      headers,
+      body: hasBody ? await request.text() : undefined,
+      // Never follow redirects: the token must only go to API_BASE_URL.
+      redirect: "error",
+    });
+  } catch {
+    return Response.json({ error: "Upstream request failed" }, { status: 502 });
+  }
 
-  const responseHeaders = new Headers(upstream.headers);
-  for (const name of DROPPED_RESPONSE_HEADERS) responseHeaders.delete(name);
+  const responseHeaders = new Headers(SAFETY_HEADERS);
+  for (const name of FORWARDED_RESPONSE_HEADERS) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders.set(name, value);
+  }
   return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
 }
 
