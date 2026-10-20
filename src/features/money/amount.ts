@@ -2,7 +2,7 @@
 // Never use Number()/parseFloat on an amount or price, not even for display:
 // floats lose digits on 18-decimal amounts and accept junk like "1e5".
 
-const AMOUNT_RE = /^(0|[1-9]\d*)(?:\.(\d+))?$/;
+export const AMOUNT_RE = /^(0|[1-9]\d*)(?:\.(\d+))?$/;
 
 export type ParseError = "format" | "too_many_decimals";
 export type ParseResult = { ok: true; value: bigint } | { ok: false; error: ParseError };
