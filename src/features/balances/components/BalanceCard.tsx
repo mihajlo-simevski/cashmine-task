@@ -6,15 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import type { AdjustedBalance } from "@/features/claims/overlay";
+import Amount from "@/features/money/components/Amount";
 import { formatAmount, formatUsd, usdCents } from "@/features/money/amount";
 
-function Tile({ label, value }: { label: string; value: string }) {
+function Tile({ label, value, decimals }: { label: string; value: bigint; decimals: number }) {
   return (
     <View className="min-w-0 flex-1 rounded-xl bg-muted px-3 py-2.5">
       <Text className="text-muted-foreground text-xs font-medium">{label}</Text>
-      <Text className="text-sm font-semibold" selectable>
-        {value}
-      </Text>
+      <Amount value={value} decimals={decimals} className="text-sm font-semibold" />
     </View>
   );
 }
@@ -32,9 +31,11 @@ export default function BalanceCard({ balance }: { balance: AdjustedBalance }) {
             <Text className="text-muted-foreground text-sm font-semibold">
               {asset} · {t("home.available")}
             </Text>
-            <Text className="text-2xl font-bold tracking-tight" selectable>
-              {fmt(balance.available)}
-            </Text>
+            <Amount
+              value={balance.available}
+              decimals={decimals}
+              className="text-2xl font-bold tracking-tight"
+            />
             <Text variant="small" className="text-muted-foreground">
               {t("home.usdValue", {
                 value: formatUsd(usdCents(balance.available, decimals, balance.usdPrice)),
@@ -48,8 +49,8 @@ export default function BalanceCard({ balance }: { balance: AdjustedBalance }) {
           </Link>
         </View>
         <View className="flex-row gap-2">
-          <Tile label={t("home.pending")} value={fmt(balance.pending)} />
-          <Tile label={t("home.claiming")} value={fmt(balance.claiming)} />
+          <Tile label={t("home.pending")} value={balance.pending} decimals={decimals} />
+          <Tile label={t("home.claiming")} value={balance.claiming} decimals={decimals} />
         </View>
         {balance.adjustedBy > 0n ? (
           <View className="rounded-xl bg-accent px-3 py-2.5">

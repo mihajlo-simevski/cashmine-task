@@ -7,6 +7,8 @@ const en = {
     goHome: "Go to home",
     back: "Back",
     cancel: "Cancel",
+    showFull: "Show full amount {{amount}}",
+    showLess: "Show short amount",
   },
   token: {
     title: "Your API token",

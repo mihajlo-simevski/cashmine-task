@@ -1,5 +1,6 @@
 import {
   formatAmount,
+  formatAmountShort,
   formatUsd,
   parseAmount,
   totalUsdCents,
@@ -120,5 +121,22 @@ describe("usd math", () => {
     expect(formatUsd(82057n, "en-US")).toBe("$820.57");
     expect(formatUsd(5n, "en-US")).toBe("$0.05");
     expect(formatUsd(123456789012345678n, "en-US")).toBe("$1,234,567,890,123,456.78");
+  });
+});
+
+describe("formatAmountShort", () => {
+  it("cuts long fractions without rounding up and flags it", () => {
+    const value = 12345678901234591676n; // 12.345678901234591676 with 18 decimals
+    expect(formatAmountShort(value, 18)).toEqual({ text: "12.345678", truncated: true });
+    expect(formatAmountShort(19999999n, 6, 2)).toEqual({ text: "19.99", truncated: true });
+  });
+
+  it("leaves short amounts alone", () => {
+    expect(formatAmountShort(820413207n, 6)).toEqual({ text: "820.413207", truncated: false });
+    expect(formatAmountShort(12000000n, 6)).toEqual({ text: "12", truncated: false });
+  });
+
+  it("drops trailing zeros after cutting", () => {
+    expect(formatAmountShort(1000000000000001n, 18)).toEqual({ text: "0.001", truncated: true });
   });
 });

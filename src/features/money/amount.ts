@@ -122,3 +122,19 @@ export function formatUsd(cents: bigint, locale?: string): string {
   const withCents = dollars.replace(/(\d)(?!.*\d)/, `$1${decimalSep}${centsPart}`);
   return negative ? `-${withCents}` : withCents;
 }
+
+/**
+ * Short display form: at most `maxDecimals` fraction digits, cut (never rounded up) so it
+ * never shows more than the exact amount. `truncated` tells the UI to offer the full value.
+ */
+export function formatAmountShort(
+  value: bigint,
+  decimals: number,
+  maxDecimals = 6,
+): { text: string; truncated: boolean } {
+  const full = formatAmount(value, decimals, { trim: true });
+  const [whole, fraction = ""] = full.split(".");
+  if (fraction.length <= maxDecimals) return { text: full, truncated: false };
+  const cut = fraction.slice(0, maxDecimals).replace(/0+$/, "");
+  return { text: cut ? `${whole}.${cut}` : whole, truncated: true };
+}
