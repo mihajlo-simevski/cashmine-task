@@ -9,6 +9,8 @@ const en = {
     cancel: "Cancel",
     showFull: "Show full amount {{amount}}",
     showLess: "Show short amount",
+    more: "more",
+    less: "less",
   },
   token: {
     title: "Your API token",

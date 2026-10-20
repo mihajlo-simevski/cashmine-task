@@ -36,9 +36,13 @@ export default function Amount({ value, decimals, className, suffix }: AmountPro
       onPress={() => setExpanded((v) => !v)}
       accessibilityRole="button"
       accessibilityLabel={t(expanded ? "common.showLess" : "common.showFull", { amount: full })}
+      className="flex-row flex-wrap items-center gap-x-1.5"
     >
       <Text className={cn(className, "break-all")} selectable>
         {text}
+      </Text>
+      <Text className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
+        {expanded ? t("common.less") : t("common.more")}
       </Text>
     </Pressable>
   );
