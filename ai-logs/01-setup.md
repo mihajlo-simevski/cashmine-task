@@ -1,4 +1,4 @@
-# Session 1: project setup
+# Session 1: project setup (before the task slot)
 
 ## User
 

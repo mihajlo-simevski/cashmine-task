@@ -5,7 +5,7 @@ Conversations with Claude Code used to build this project, exported from the loc
 | File | What it covers |
 | --- | --- |
 | [`01-setup.md`](./01-setup.md) | Project setup before the start time: scaffolding, tooling, styling, API proxy, tests, first deploy |
-| [`02-cleanup-and-repo.md`](./02-cleanup-and-repo.md) | Cleanup, hosting rename, commits and the GitHub repo |
+| [`02-build-session.md`](./02-build-session.md) | Cleanup, design + plan with reviews, the build, Claude Design, browser testing against the live API |
 | [`commands.md`](./commands.md) | Every shell command from the sessions above, in order |
 
 Each log keeps the prompts, replies and tool calls. Long command output is shortened, and file writes show only the path and line count (the code itself is in the commit history).

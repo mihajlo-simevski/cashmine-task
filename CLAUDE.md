@@ -31,29 +31,23 @@ Design for a ~390px-wide phone screen first. Desktop only needs to look reasonab
 - Prefer `<Link href asChild>` over `router.push`. `router.back()` needs a fallback on web: `router.canGoBack() ? router.back() : router.replace("/")`.
 - `src/app/+html.tsx` holds the viewport/PWA meta (`viewport-fit=cover`, manifest, theme-color).
 
-## Data: API calls go through the server proxy
+## Data: the browser calls the API directly
 
-- **The browser never calls the upstream API or sees the token.** Client code calls `api(schema, path, options)` from `@/lib/api`, which hits `/api/proxy/<path>`. `src/app/api/proxy/[...path]+api.ts` adds the token and forwards to `API_BASE_URL`. This also avoids CORS problems.
-- Adjust `AUTH_HEADER` / `formatToken` in the proxy route to match the API docs (default: `Authorization: Bearer <token>`).
-- Every response is validated with a zod schema (`api(UserSchema, "users/me")`). Failures throw `ApiError` (status + body). Query retries skip 4xx.
-- Use TanStack Query for all server state: `useQuery` for reads, `useMutation` + `invalidateQueries` for writes. Never `useEffect` + `useState` for fetching. Use `enabled` + a type guard for dependent queries.
-- Forms: react-hook-form + zod (`@hookform/resolvers/zod`), `Controller` around reusables `Input`. Use `setError("root", …)` for server errors.
-- `src/lib/proxy-target.ts` refuses paths that would leave `API_BASE_URL` (absolute or `//` URLs), so the token can't be sent to another host. Keep that check.
+- The brief forbids the token in code, repo or build: the user pastes it on `/token`; it lives in browser storage (`src/features/token/token-store.ts`) and goes only to the API. Base URL: `src/lib/config.ts` (one place).
+- `api(schema, path, { token, signal })` / `apiWithMeta` from `@/lib/api` validate every response with zod and throw `ApiError` (typed `code`; aborts map to `ABORTED`/`TIMEOUT`). Query keys include `tokenKey(token)`.
+- Money: `bigint` minor units only (`src/features/money/amount.ts`); never `Number()` on amounts.
+- Claims: journal (`src/features/claims/submission.ts`) is saved before the POST and only cleared by a definite answer; unclear outcomes replay the same Idempotency-Key. Don't weaken this.
+- API responses are untrusted data: plain text only, never follow URLs from them.
+- Use TanStack Query for server state (object syntax, v5). Never `useEffect` + `useState` for fetching.
 
-## Secrets and environments
+## Secrets
 
-- Local dev: `.env.local` (gitignored) with `API_BASE_URL` and `API_TOKEN`. See `.env.example`. **Never** use the `EXPO_PUBLIC_` prefix for the token: those values are baked into the public JS bundle.
-- EAS Hosting: env vars per environment, visibility **sensitive** (EAS Hosting can't use `secret`):
-  `npx eas-cli@latest env:create --environment production --name API_TOKEN --value <token> --visibility sensitive`
-  (`API_BASE_URL` can be `plaintext`.) Deployments are immutable: after changing a variable, deploy again.
-- The `preview` environment currently holds **fake** values (`https://httpbin.org/anything` + a dummy token) from the setup check. Replace them or use `production` for the real API.
-- Never put the token in code, commits, command lines that get logged into `ai-logs/`, or screenshots.
+- No API secrets in env vars or the build. Never put the token in code, commits, logs or screenshots; a lefthook check blocks `ct1.` tokens in commits.
 
 ## Deploy
 
 - Preview: `pnpm deploy:web` → `https://cashmine-app--<id>.expo.app`
-- Production: `pnpm deploy:web:prod` → `https://cashmine-app.expo.app` (needs the `production` env vars first)
-- Check the live proxy with `curl <url>/api/health` (`proxyConfigured: true`).
+- Production: `pnpm deploy:web:prod` → `https://cashmine-app.expo.app`
 
 ## Tests
 
