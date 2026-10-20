@@ -78,7 +78,7 @@ export const ActivityItemSchema = z.object({
 });
 
 export const ActivityPageSchema = z.object({
-  items: z.array(ActivityItemSchema).max(20),
+  items: z.array(ActivityItemSchema).max(50),
   nextCursor: z.string().max(500).nullable(),
 });
 
