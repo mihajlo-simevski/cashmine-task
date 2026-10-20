@@ -108,10 +108,18 @@ export async function apiWithMeta<T>(
   path: string,
   { token, method = "GET", body, headers, timeoutMs = DEFAULT_TIMEOUT_MS, signal }: RequestOptions,
 ): Promise<{ data: T; status: number; headers: HeaderReader }> {
+  // One controller for both reasons a request stops: our timeout, or the caller cancelling
+  // (TanStack Query cancels a request it no longer needs). Each abort gets a named reason
+  // and is turned into an ApiError below, so a raw AbortError never escapes.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const onAbort = () => controller.abort();
-  signal?.addEventListener("abort", onAbort);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new DOMException("Request timed out", "TimeoutError"));
+  }, timeoutMs);
+  const onAbort = () => controller.abort(new DOMException("Request cancelled", "AbortError"));
+  if (signal?.aborted) onAbort();
+  else signal?.addEventListener("abort", onAbort, { once: true });
 
   let response: Response;
   try {
@@ -127,7 +135,8 @@ export async function apiWithMeta<T>(
       signal: controller.signal,
     });
   } catch {
-    throw new ApiError(0, signal?.aborted ? "ABORTED" : "NETWORK");
+    // A timeout means "no answer": for a POST the claim may still exist (treated as unknown).
+    throw new ApiError(0, timedOut ? "TIMEOUT" : signal?.aborted ? "ABORTED" : "NETWORK");
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
