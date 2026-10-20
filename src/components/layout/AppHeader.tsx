@@ -12,7 +12,13 @@ export default function AppHeader({ title, right }: AppHeaderProps) {
   return (
     <View className="flex-row items-center justify-between gap-2">
       <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
-        <Image source={mark} className="size-8" accessibilityLabel="CashMine" />
+        <Image
+          source={mark}
+          // Fixed size: className sizing isn't applied to Image on web.
+          style={{ width: 32, height: 32 }}
+          resizeMode="contain"
+          accessibilityLabel="CashMine"
+        />
         <Text className="min-w-0 flex-1 text-xl font-bold tracking-tight" role="heading">
           {title}
         </Text>
